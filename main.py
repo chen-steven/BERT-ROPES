@@ -32,9 +32,9 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     for i in range(args.epochs):
         for step, batch in enumerate(epoch_iterator):
             for t in batch:
-                batch[t].to(device)
+                batch[t] = batch[t].to(args.gpu)
             #batch = tuple(t.to(args.device) for t in batch)
-
+        
             # inputs = {
             #     "input_ids": batch[0],
             #     "attention_mask": batch[1],
@@ -89,6 +89,7 @@ def main():
     parser.add_argument('--weight-decay', default=0.0, type=float)
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
+    parser.add_argument('--epochs', default=4, type=int)
     args = parser.parse_args()
     
     config = AutoConfig.from_pretrained(BERT_MODEL)
