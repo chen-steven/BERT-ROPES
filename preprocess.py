@@ -1,0 +1,1 @@
+ROPES_DATA_PATH = 'data/ropes/'
