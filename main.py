@@ -4,6 +4,7 @@ from transformers import BertTokenizerFast, AutoModelForQuestionAnswering, AutoC
 from torch.utils.data import DataLoader, RandomSampler
 from dataset import ROPES
 import utils
+import evaluate
 from tqdm import tqdm
 
 BERT_MODEL = "bert-base-cased"
@@ -33,19 +34,10 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         for step, batch in enumerate(epoch_iterator):
             for t in batch:
                 batch[t] = batch[t].to(args.gpu)
-            #batch = tuple(t.to(args.device) for t in batch)
-        
-            # inputs = {
-            #     "input_ids": batch[0],
-            #     "attention_mask": batch[1],
-            #     "token_type_ids": batch[2],
-            #     "start_positions": batch[3],
-            #     "end_positions": batch[4],
-            # }
 
             outputs = model(**batch)
             loss = outputs[0]
-            print(loss.item())
+            #print(loss.item())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
@@ -54,6 +46,7 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         test(args, model, dev_dataset, tokenizer)
 
 def test(args, model, dev_dataset, tokenizer):
+    print('hello')
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
     model.eval()
     dev_dataloader = DataLoader(dev_dataset, batch_size=args.batch_size)
@@ -63,24 +56,30 @@ def test(args, model, dev_dataset, tokenizer):
     predictions = {}
     for step, batch in enumerate(dev_iterator):
         for key in keys:
-            batch[key].to(device)
+            batch[key] = batch[key].to(device)
+        batch['return_dict'] = True
         with torch.no_grad():
             outputs = model(**batch)
-            loss = outputs[0]
+            loss = outputs['loss']
             total_loss += loss.item()
 
         batch_size = batch['input_ids'].size(0)
         for i in range(batch_size):
-            predictions[batch['qid'][i]] = tokenizer.convert_ids_to_tokens(batch['input_ids'][i])
+            predictions[batch['qid'][i]] = evaluate.ROPESResult(batch['quid'][i],
+                                                       outputs['start_logits'][i],
+                                                       outputs['end_logits'][i],
+                                                       batch['input_ids'][i])
+
+    res = evaluate.main(predictions, tokenizer)
+    return total_loss, res['exact_match'], res['f1']
 
 
-def evaluate(predictions, tokenizer):
-    pass
 
 
 
 
 def main():
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument('--gpu', default=0, type=int)
@@ -95,10 +94,13 @@ def main():
     config = AutoConfig.from_pretrained(BERT_MODEL)
     tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
+    print('tesasdfadf')
     train_dataset = ROPES(tokenizer, 'train-v1.0.json')
-    dev_dataset = ROPES(tokenizer, 'dev-v1.0.json')
+    dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
+    print(dev_dataset)
 
     utils.set_random_seed(args.seed)
+    #test(args, model, dev_dataset, tokenizer)
     train(args, model, train_dataset, dev_dataset, tokenizer)
 
 if __name__ == '__main__':
