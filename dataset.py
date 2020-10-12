@@ -30,14 +30,8 @@ class ROPES(Dataset):
             q_idx = self.questions[i].find(answer)
             c_idx = self.contexts[i].find(answer)
 
-            if c_idx != -1:
-                y1 = self.encodings.char_to_token(i, c_idx)
-                y2 = self.encodings.char_to_token(i, c_idx + len(answer) - 1)
-                if not y1:
-                    y1, y2 = 512, 512
-                if not y2 and y1:
-                    y2 = y1 + len(self.tokenizer.tokenize(answer)) - 1
-            elif q_idx != -1:
+
+            if q_idx != -1:
                 assert(self.questions[i][q_idx:q_idx+len(answer)] == answer)
                 y1 = question_encodings.char_to_token(i, q_idx)-1+len(context_encodings[i])
                 y2 = question_encodings.char_to_token(i, q_idx+len(answer)-1)
@@ -49,6 +43,13 @@ class ROPES(Dataset):
 
                 y1 = min(y1, 512)
                 y2 = min(y2, 512)
+            elif c_idx != -1:
+                y1 = self.encodings.char_to_token(i, c_idx)
+                y2 = self.encodings.char_to_token(i, c_idx + len(answer) - 1)
+                if not y1:
+                    y1, y2 = 512, 512
+                if not y2 and y1:
+                    y2 = y1 + len(self.tokenizer.tokenize(answer)) - 1
 
 
 
