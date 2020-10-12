@@ -28,9 +28,10 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
 
     model.zero_grad()
-    epoch_iterator = tqdm(train_dataloader, desc="Iteration")
+    #epoch_iterator = tqdm(train_dataloader, desc="Iteration")
     best_em, best_f1 = -1, -1
     for i in range(args.epochs):
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration")
         for step, batch in enumerate(epoch_iterator):
             for t in batch:
                 batch[t] = batch[t].to(args.gpu)
@@ -43,32 +44,42 @@ def train(args, model, dataset, dev_dataset, tokenizer):
 
             optimizer.step()
             model.zero_grad()
-        test(args, model, dev_dataset, tokenizer)
-
+        dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
+        model.train()
+        if dev_em > best_em:
+            best_em = dev_em
+        print('EM', dev_em, 'F1', dev_f1, 'loss',dev_loss)
 def test(args, model, dev_dataset, tokenizer):
-    print('hello')
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
     model.eval()
-    dev_dataloader = DataLoader(dev_dataset, batch_size=args.batch_size)
+    dev_dataloader = DataLoader(dev_dataset, batch_size=args.dev_batch_size)
     dev_iterator = tqdm(dev_dataloader)
     total_loss = 0
     keys = ['input_ids', 'attention_mask', 'token_type_ids', 'start_positions', 'end_positions']
     predictions = {}
     for step, batch in enumerate(dev_iterator):
-        for key in keys:
-            batch[key] = batch[key].to(device)
-        batch['return_dict'] = True
+     #   print(batch)
+        qids = batch['id']
+        del batch['id']
+        for key in batch:
+            batch[key] = batch[key].to(args.gpu)
+#        print(batch)
+        #batch['return_dict'] = True
+        #qids = batch['id']
+        #del batch['id']
         with torch.no_grad():
-            outputs = model(**batch)
+            outputs = model(**batch, return_dict=True)
             loss = outputs['loss']
             total_loss += loss.item()
 
         batch_size = batch['input_ids'].size(0)
         for i in range(batch_size):
-            predictions[batch['qid'][i]] = evaluate.ROPESResult(batch['quid'][i],
+            predictions[qids[i]] = evaluate.ROPESResult(qids[i],
                                                        outputs['start_logits'][i],
                                                        outputs['end_logits'][i],
                                                        batch['input_ids'][i])
+        
 
     res = evaluate.main(predictions, tokenizer)
     return total_loss, res['exact_match'], res['f1']
@@ -88,19 +99,18 @@ def main():
     parser.add_argument('--weight-decay', default=0.0, type=float)
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
-    parser.add_argument('--epochs', default=4, type=int)
+    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--dev-batch-size', default=32, type=int)
     args = parser.parse_args()
     
     config = AutoConfig.from_pretrained(BERT_MODEL)
     tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
-    print('tesasdfadf')
     train_dataset = ROPES(tokenizer, 'train-v1.0.json')
     dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
-    print(dev_dataset)
 
     utils.set_random_seed(args.seed)
-    #test(args, model, dev_dataset, tokenizer)
+#    print(test(args, model, dev_dataset, tokenizer))
     train(args, model, train_dataset, dev_dataset, tokenizer)
 
 if __name__ == '__main__':
