@@ -2,6 +2,7 @@ import collections
 import re
 import string
 import json
+import torch
 
 class ROPESResult:
     def __init__(self, qid, start_logits, end_logits, input_ids):
@@ -123,14 +124,35 @@ def get_raw_scores(dataset, predictions):
 
 def convert_to_predictions(predictions, tokenizer):
     ans_predictions = {}
-    for qid, res in predictions:
+    for qid, res in predictions.items:
         start_indexes = _get_best_indexes(res.start_logits)
         end_indexes = _get_best_indexes(res.end_logits)
-        start_idx = start_indexes[0]
-        end_idx = end_indexes[0]
+        seq_len = torch.sum(res.input_ids != 0)
+        s, e = 0,0
+        for start_index in start_indexes:
+            found = False
+            for end_index in end_indexes:
+                # We could hypothetically create invalid predictions, e.g., predict
+                # that the start of the span is in the question. We throw out all
+                # invalid predictions.
+                if start_index >= seq_len:
+                    continue
+                if end_index >= seq_len:
+                    continue
+                if end_index < start_index:
+                    continue
+                #length = end_index - start_index + 1
+                s = start_idx
+                e = end_idx
+                found=True
+                break
+            if found:
+                break
+        #start_idx = start_indexes[0]
+        #end_idx = end_indexes[0]
         ans = ""
-        if start_idx < 512 and end_idx < 512 and start_idx < end_idx:
-            ans = tokenizer.decode(res.input_ids[start_idx:end_idx+1])
+        if s < 512 and e < 512 and s < e:
+            ans = tokenizer.decode(res.input_ids.tolist()[s:e+1])
         ans_predictions[qid] = ans
     return ans_predictions
 
