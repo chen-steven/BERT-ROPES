@@ -27,7 +27,8 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         #{"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay":0.0}
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warpup_steps,
+                                                num_training_steps=len(train_dataloader))
     model.zero_grad()
     #epoch_iterator = tqdm(train_dataloader, desc="Iteration")
     best_em, best_f1 = -1, -1
@@ -44,12 +45,15 @@ def train(args, model, dataset, dev_dataset, tokenizer):
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
             optimizer.step()
+            scheduler.step()
             model.zero_grad()
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
         model.train()
         if dev_em > best_em:
             best_em = dev_em
         print('EM', dev_em, 'F1', dev_f1, 'loss',dev_loss)
+
+
 def test(args, model, dev_dataset, tokenizer):
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -86,12 +90,7 @@ def test(args, model, dev_dataset, tokenizer):
     return total_loss, res['exact_match'], res['f1']
 
 
-
-
-
-
 def main():
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument('--gpu', default=0, type=int)
