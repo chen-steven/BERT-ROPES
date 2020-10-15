@@ -19,7 +19,7 @@ class ROPES(Dataset):
     def __getitem__(self, idx):
         inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
         if self.eval:
-            inputs['id'] = self.qids[idx]
+            inputs['id'] = self.examples[idx].qas_id
         return inputs
 
     def __len__(self):
@@ -39,13 +39,21 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         if q_idx != -1:
             start_position = encodings.char_to_token(i, q_idx)
             end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
-
-        else:
+#        while q_idx != -1 and q_idx+len(answer) < len(question) and question[q_idx+len(answer)].isalpha():
+#            q_idx = question.find(answer, q_idx+1)
+#        while c_idx != -1 and c_idx+len(answer) < len(context) and context[c_idx+len(answer)].isalpha():
+#            c_idx = context.find(answer, c_idx+1)
+        elif c_idx != -1:
             question_tokens = tokenizer.tokenize(question)
             context_encoding = tokenizer(context)
             start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
             end_position = context_encoding.char_to_token(c_idx+len(answer)-1) + len(question_tokens) + 1
-
+        #elif q_idx != -1:
+        #    start_position = encodings.char_to_token(i, q_idx)
+        #    end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
+        else:
+            start_position = 0
+            end_position = 0
         tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position+1])
         if tmp != answer and start_position < 512 and end_position < 512:
             print(tmp, answer)
@@ -89,8 +97,6 @@ def get_examples(file_path):
                         contexts.append(context)
     return examples, questions, contexts
 
-
-    return contexts, questions, answers, qids
 
 if __name__ == '__main__':
     from transformers import BertTokenizerFast, AutoTokenizer

@@ -3,6 +3,7 @@ import re
 import string
 import json
 import torch
+from tqdm import tqdm
 
 class ROPESResult:
     def __init__(self, qid, start_logits, end_logits, input_ids):
@@ -124,7 +125,7 @@ def get_raw_scores(dataset, predictions):
 
 def convert_to_predictions(predictions, tokenizer):
     ans_predictions = {}
-    for qid, res in predictions.items:
+    for qid, res in tqdm(predictions.items()):
         start_indexes = _get_best_indexes(res.start_logits)
         end_indexes = _get_best_indexes(res.end_logits)
         seq_len = torch.sum(res.input_ids != 0)
@@ -141,9 +142,11 @@ def convert_to_predictions(predictions, tokenizer):
                     continue
                 if end_index < start_index:
                     continue
-                #length = end_index - start_index + 1
-                s = start_idx
-                e = end_idx
+                length = end_index - start_index + 1
+                if length > 5:
+                    continue
+                s = start_index
+                e = end_index
                 found=True
                 break
             if found:
@@ -154,6 +157,9 @@ def convert_to_predictions(predictions, tokenizer):
         if s < 512 and e < 512 and s < e:
             ans = tokenizer.decode(res.input_ids.tolist()[s:e+1])
         ans_predictions[qid] = ans
+
+    with open('predictions.out', 'w') as f:
+        json.dump(ans_predictions, f)
     return ans_predictions
 
 
