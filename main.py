@@ -21,14 +21,14 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
-            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
             "weight_decay": args.weight_decay
         },
-        #{"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay":0.0}
+        {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay":0.0}
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warpup_steps,
-                                                num_training_steps=len(train_dataloader))
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
+                                                num_training_steps=len(train_dataloader)*args.epochs)
     model.zero_grad()
     #epoch_iterator = tqdm(train_dataloader, desc="Iteration")
     best_em, best_f1 = -1, -1
@@ -101,6 +101,7 @@ def main():
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--dev-batch-size', default=32, type=int)
+    parser.add_argument('--num-warmup-steps', default=0, type=int)
     args = parser.parse_args()
     
     config = AutoConfig.from_pretrained(BERT_MODEL)
