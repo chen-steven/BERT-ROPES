@@ -3,6 +3,7 @@ import argparse
 from transformers import (BertTokenizerFast, AutoModelForQuestionAnswering, AutoConfig, AdamW,
                           get_linear_schedule_with_warmup)
 from torch.utils.data import DataLoader, RandomSampler
+import torch.nn.functional as F
 from dataset import ROPES
 import utils
 import evaluate
@@ -63,6 +64,7 @@ def test(args, model, dev_dataset, tokenizer):
     total_loss = 0
     keys = ['input_ids', 'attention_mask', 'token_type_ids', 'start_positions', 'end_positions']
     predictions = {}
+    answers = {}
     for step, batch in enumerate(dev_iterator):
      #   print(batch)
         qids = batch['id']
@@ -74,16 +76,19 @@ def test(args, model, dev_dataset, tokenizer):
         #qids = batch['id']
         #del batch['id']
         with torch.no_grad():
-            outputs = model(**batch, return_dict=True)
-            loss = outputs['loss']
+            outputs = model(**batch)
+            loss = outputs[0]
             total_loss += loss.item()
 
         batch_size = batch['input_ids'].size(0)
+        start_idxs, end_idxs = utils.discretize(F.softmax(outputs[1], dim=1), F.softmax(outputs[2], dim=1))
         for i in range(batch_size):
-            predictions[qids[i]] = evaluate.ROPESResult(qids[i],
-                                                       outputs['start_logits'][i],
-                                                       outputs['end_logits'][i],
-                                                       batch['input_ids'][i])
+            s, e = start_idxs[i], end_idxs[i]
+            answers[qids[i]] = tokenizer.decode(batch['input_ids'][i][s:e+1])
+            # predictions[qids[i]] = evaluate.ROPESResult(qids[i],
+            #                                            outputs['start_logits'][i],
+            #                                            outputs['end_logits'][i],
+            #                                            batch['input_ids'][i])
         
 
     res = evaluate.main(predictions, tokenizer)

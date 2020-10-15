@@ -169,5 +169,5 @@ def main(predictions, tokenizer):
     with open('data/ropes/dev-v1.0.json', 'r') as f:
         data = json.load(f)
 
-    ans_predictions = convert_to_predictions(predictions, tokenizer)
-    return get_raw_scores(data['data'], ans_predictions)
+    #ans_predictions = convert_to_predictions(predictions, tokenizer)
+    return get_raw_scores(data['data'], predictions)
