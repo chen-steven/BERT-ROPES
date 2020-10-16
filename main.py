@@ -53,7 +53,7 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         if dev_em > best_em:
             best_em = dev_em
         print('EM', dev_em, 'F1', dev_f1, 'loss',dev_loss)
-
+    return best_em
 
 def test(args, model, dev_dataset, tokenizer):
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
@@ -94,6 +94,15 @@ def test(args, model, dev_dataset, tokenizer):
     res = evaluate.main(answers, tokenizer)
     return total_loss, res['exact_match'], res['f1']
 
+def trainer(args, model, dataset, dev_dataset, tokenizer):
+    seeds = [42, 142, 242]
+    ems = []
+    for seed in seeds:
+        args.seed = seed
+        utils.set_random_seed(seed)
+        best_em = train(args, model, dataset, dev_dataset, tokenizer)
+        ems.append(best_em)
+    print(sum(ems)/len(ems))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -117,7 +126,7 @@ def main():
 
     utils.set_random_seed(args.seed)
 #    print(test(args, model, dev_dataset, tokenizer))
-    train(args, model, train_dataset, dev_dataset, tokenizer)
+    trainer(args, model, train_dataset, dev_dataset, tokenizer)
 
 if __name__ == '__main__':
     main()
