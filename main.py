@@ -84,14 +84,14 @@ def test(args, model, dev_dataset, tokenizer):
         start_idxs, end_idxs = utils.discretize(F.softmax(outputs[1], dim=1), F.softmax(outputs[2], dim=1))
         for i in range(batch_size):
             s, e = start_idxs[i], end_idxs[i]
-            answers[qids[i]] = tokenizer.decode(batch['input_ids'][i][s:e+1])
+            answers[qids[i]] = tokenizer.decode(batch['input_ids'][i].tolist()[s:e+1])
             # predictions[qids[i]] = evaluate.ROPESResult(qids[i],
             #                                            outputs['start_logits'][i],
             #                                            outputs['end_logits'][i],
             #                                            batch['input_ids'][i])
         
 
-    res = evaluate.main(predictions, tokenizer)
+    res = evaluate.main(answers, tokenizer)
     return total_loss, res['exact_match'], res['f1']
 
 
