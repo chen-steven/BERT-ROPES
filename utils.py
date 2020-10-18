@@ -13,6 +13,21 @@ def set_random_seed(seed):
 def load_ropes_examples():
     examples = []
 
+def convert_idx(text, tokens):
+    current = 0
+    spans = []
+    for token in tokens:
+        tmp = current
+        current = text.find(token, current)
+
+        if current < 0:
+            print(text, tmp, tokens)
+            print(f"Token {token} cannot be found")
+            raise Exception()
+        spans.append((current, current + len(token)))
+        current += len(token)
+    return spans
+
 def discretize(p_start, p_end, max_len=15, no_answer=False):
     """Discretize soft predictions to get start and end indices.
     Choose the pair `(i, j)` of indices that maximizes `p1[i] * p2[j]`

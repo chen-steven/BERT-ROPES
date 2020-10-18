@@ -2,11 +2,13 @@ from torch.utils.data import Dataset
 import json
 from tqdm import tqdm
 import torch
-from utils import ROPESExample
+from utils import ROPESExample, convert_idx
+from transformers import BasicTokenizer
 from transformers.data.processors.squad import squad_convert_examples_to_features, SquadExample
 
 ROPES_DATA_PATH = 'data/ropes/'
 MAX_PARAGRAPH_LEN = 400
+SWAP_STR = '***'
 
 class ROPES(Dataset):
     def __init__(self, tokenizer, file_path, eval=False):
@@ -68,9 +70,39 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
     encodings['end_positions'] = end_positions
     return encodings
 
+def create_augmented_example(question, answer):
+    answer = answer.strip()
+    processed_q = question.replace('?', ' ?').replace(',', ' ,')
+    q_idx = processed_q.find(answer)
+    if q_idx == -1:
+        return None
+    or_idx = processed_q.find(' or ')
+    tokens = processed_q.split()
+    spans = convert_idx(processed_q, tokens)
+    answer_start, answer_end = q_idx, q_idx+len(answer)
+    answer_span = []
+    for idx, span in enumerate(spans):
+        if not (answer_end <= span[0] or answer_start >= span[1]):
+            answer_span.append(idx)
+    start, end = answer_span[0], answer_span[-1]
 
-def get_examples(file_path):
+    if or_idx != -1 and q_idx+len(answer) == or_idx:
+        candidate = ' '.join(tokens[end+2:end+3+(end-start)])
+    elif or_idx != -1 and or_idx+len(' or ') == q_idx:
+        candidate = ' '.join(tokens[start - (end-start) -2: start-1])
+    else:
+        #print(question, answer, q_idx, or_idx, 'not found')
+        return None
+
+    tmp = question.replace(candidate, SWAP_STR)
+    tmp = tmp.replace(answer, candidate)
+    tmp = tmp.replace(SWAP_STR, answer)
+    #print(tmp, candidate, answer)
+    return tmp
+
+def get_examples(file_path, augmented=True):
     examples, questions, contexts = [], [], []
+    count, total = 0, 0
     with open(f'{ROPES_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
         data = json.load(f)
         data = data['data']
@@ -88,6 +120,18 @@ def get_examples(file_path):
                         q_idx = question.find(answer)
                         if q_idx != -1:
                             start_position = q_idx
+
+                            if question.find(' or ') != -1:
+                                total += 1
+                                if augmented:
+                                    aug = create_augmented_example(question, answer)
+                                    if aug:
+                                        count += 1
+                                        example = ROPESExample(id+'_1', aug, context, answer.strip(), aug.find(answer))
+                                        examples.append(example)
+                                        questions.append(aug)
+                                        context.append(context)
+
                         else:
                             start_position = sit_idx + len(background) + 1
                         #example = SquadExample(id, question, context, answer, start_position, 'test')
@@ -95,6 +139,7 @@ def get_examples(file_path):
                         examples.append(example)
                         questions.append(question)
                         contexts.append(context)
+    print(count, total)
     return examples, questions, contexts
 
 
@@ -102,7 +147,7 @@ if __name__ == '__main__':
     from transformers import BertTokenizerFast, AutoTokenizer
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     #tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-    ROPES(tokenizer,'dev-v1.0.json')
+    ROPES(tokenizer,'train-v1.0.json')
     #print('converting to features...')
     #convert_examples_to_features(examples, tokenizer, questions, contexts )
 
