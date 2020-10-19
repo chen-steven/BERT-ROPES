@@ -30,6 +30,7 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
                                                 num_training_steps=len(train_dataloader)*args.epochs)
+    utils.set_random_seed(args.seed)
     model.zero_grad()
     #epoch_iterator = tqdm(train_dataloader, desc="Iteration")
     best_em, best_f1 = -1, -1
@@ -95,9 +96,10 @@ def test(args, model, dev_dataset, tokenizer):
     return total_loss, res['exact_match'], res['f1']
 
 def trainer(args, model, dataset, dev_dataset, tokenizer):
-    seeds = [42, 142, 242]
+    seeds = [10, 20, 30]
     ems = []
     for seed in seeds:
+        print(f'Running with seed: {seed}')
         args.seed = seed
         utils.set_random_seed(seed)
         best_em = train(args, model, dataset, dev_dataset, tokenizer)

@@ -17,7 +17,7 @@ class ROPES(Dataset):
         examples, questions, contexts = get_examples(file_path)
         self.examples = examples
         self.encodings = convert_examples_to_features(examples, tokenizer, questions, contexts)
-
+        print(len(examples), len(questions), len(contexts))
     def __getitem__(self, idx):
         inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
         if self.eval:
@@ -130,7 +130,7 @@ def get_examples(file_path, augmented=True):
                                         example = ROPESExample(id+'_1', aug, context, answer.strip(), aug.find(answer))
                                         examples.append(example)
                                         questions.append(aug)
-                                        context.append(context)
+                                        contexts.append(context)
 
                         else:
                             start_position = sit_idx + len(background) + 1
