@@ -85,6 +85,11 @@ def discretize(p_start, p_end, max_len=15, no_answer=False):
 
     return start_idxs, end_idxs
 
+
+def cross_entropy_loss(logits, target):
+    return -torch.log_softmax(logits, -1)[target]
+
+
 class ROPESExample:
     def __init__(self, qas_id, question, context, answer, start_position):
         self.qas_id = qas_id

@@ -13,6 +13,10 @@ BERT_MODEL = "bert-base-cased"
 
 
 def train(args, model, dataset, dev_dataset, tokenizer):
+    if args.use_multi_labels:
+        print('Using multiple labels')
+    if args.use_augmented_examples:
+        print('Using augmented examples')
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     model.train()
@@ -37,12 +41,27 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     for i in range(args.epochs):
         epoch_iterator = tqdm(train_dataloader, desc="Iteration")
         for step, batch in enumerate(epoch_iterator):
+            if args.use_multi_labels:
+                batch, start_labels, end_labels = batch
+
             for t in batch:
                 batch[t] = batch[t].to(args.gpu)
 
             outputs = model(**batch)
-            loss = outputs[0]
-            #print(loss.item())
+
+            if args.use_multi_labels:
+                nll_loss = 0
+                start_logits, end_logits = outputs[1], outputs[2]
+                batch_size = start_logits.size(0)
+                for j in range(len(batch_size)):
+                    tmp = 0
+                    for s, e in zip(start_labels, end_labels):
+                        tmp += utils.cross_entropy_loss(start_logits[j], s)+utils.cross_entropy_loss(end_logits[j], e)
+                    nll_loss += tmp/len(start_logits[i])
+                loss = nll_loss/batch_size
+            else:
+                loss = outputs[0]
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
@@ -118,13 +137,15 @@ def main():
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--dev-batch-size', default=32, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
+    parser.add_argument('--use-augmented-examples', action="store_true")
+    parser.add_argument('--use-multi-labels', action="store_true")
     args = parser.parse_args()
     
     config = AutoConfig.from_pretrained(BERT_MODEL)
     tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
-    train_dataset = ROPES(tokenizer, 'train-v1.0.json')
-    dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
+    train_dataset = ROPES(args, tokenizer, 'train-v1.0.json')
+    dev_dataset = ROPES(args, tokenizer, 'dev-v1.0.json', eval=True)
 
     utils.set_random_seed(args.seed)
 #    print(test(args, model, dev_dataset, tokenizer))
