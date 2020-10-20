@@ -42,7 +42,10 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         epoch_iterator = tqdm(train_dataloader, desc="Iteration")
         for step, batch in enumerate(epoch_iterator):
             if args.use_multi_labels:
-                batch, start_labels, end_labels = batch
+                start_labels = batch['start_multi_label']
+                end_labels = batch['end_multi_label']
+                del batch['start_multi_label']
+                del batch['end_multi_label']
 
             for t in batch:
                 batch[t] = batch[t].to(args.gpu)
@@ -53,15 +56,22 @@ def train(args, model, dataset, dev_dataset, tokenizer):
                 nll_loss = 0
                 start_logits, end_logits = outputs[1], outputs[2]
                 batch_size = start_logits.size(0)
-                for j in range(len(batch_size)):
-                    tmp = 0
-                    for s, e in zip(start_labels, end_labels):
-                        tmp += utils.cross_entropy_loss(start_logits[j], s)+utils.cross_entropy_loss(end_logits[j], e)
-                    nll_loss += tmp/len(start_logits[i])
+            
+                for j in range(batch_size):
+                
+                    #for s0, s1, e0, e1 in zip(start_labels[j], end_labels[j]):
+                    #    if s != -1 and e != -1:
+                    c = 1
+                    tmp = utils.cross_entropy_loss(start_logits[j], start_labels[0][j])+utils.cross_entropy_loss(end_logits[j], end_labels[0][j])
+                    if start_labels[1][j] != -1 and end_labels[1][j] != -1:
+                        c = 2
+                        tmp += utils.cross_entropy_loss(start_logits[j], start_labels[1][j])+utils.cross_entropy_loss(end_logits[j], end_labels[1][j])
+                    
+                    nll_loss += tmp/c
                 loss = nll_loss/batch_size
             else:
                 loss = outputs[0]
-
+            
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 

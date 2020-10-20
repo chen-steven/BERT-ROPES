@@ -22,14 +22,17 @@ class ROPES(Dataset):
 
         self.encodings, self.start_multi_label, self.end_multi_label = convert_examples_to_features(examples,
                                                                     tokenizer, questions, contexts)
+        print(len(self.start_multi_label), len(self.start_multi_label[0]))
         print(len(examples), len(questions), len(contexts))
     def __getitem__(self, idx):
         inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
         if self.eval:
             inputs['id'] = self.examples[idx].qas_id
 
-        if args.use_multi_labels and not self.eval:
-            return inputs, self.start_multi_label[idx], self.end_multi_label[idx]
+        if self.args.use_multi_labels and not self.eval:
+            inputs['start_multi_label'] = self.start_multi_label[idx]
+            inputs['end_multi_label'] = self.end_multi_label[idx]
+        
         return inputs
 
     def __len__(self):
@@ -50,8 +53,12 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         q_idx = question.find(answer)
         c_idx = context.find(answer)
         if q_idx != -1:
-            start_position = min(encodings.char_to_token(i, q_idx),512)
-            end_position = min(encodings.char_to_token(i, q_idx+len(answer)-1),512)
+            start_position = encodings.char_to_token(i, q_idx)
+            end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
+            if start_position >= 512:
+                start_position = 0
+            if end_position >= 512:
+                end_position = 0
             start_labels.append(start_position)
             end_labels.append(end_position)
 
@@ -63,8 +70,12 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         if c_idx != -1:
             question_tokens = tokenizer.tokenize(question)
             context_encoding = tokenizer(context)
-            start_position = min(context_encoding.char_to_token(c_idx) + len(question_tokens) + 1, 512)
-            end_position = min(context_encoding.char_to_token(c_idx+len(answer)-1) + len(question_tokens) + 1,512)
+            start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
+            end_position = context_encoding.char_to_token(c_idx+len(answer)-1) + len(question_tokens) + 1
+            if start_position >= 512:
+                start_position = 0
+            if end_position >= 512:
+                end_position = 0
             start_labels.append(start_position)
             end_labels.append(end_position)
         #elif q_idx != -1:
@@ -80,6 +91,10 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
             count += 1
             print(tmp, answer)
 
+        if len(start_labels) == 1:
+            start_labels.append(-1)
+        if len(end_labels) == 1:
+            end_labels.append(-1)
 
         start_positions.append(start_labels[0])
         end_positions.append(end_labels[0])
