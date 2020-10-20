@@ -31,17 +31,32 @@ class SentenceSelection:
 
 
 def process(examples, path, k=5):
+    tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     s = SentenceSelection()
     processed_examples = []
     for example in examples:
         context = example.background + ' ' + example.situation
         sents, k_idxs = s.get_k_most_similar(context, example.question, example.answer, k)
+
+        combined = ' '.join(sents)
+        encodings = tokenizer(combined)
+
+        # mask out sentences
+        for i in range(len(sents)):
+            if i not in k_idxs:
+                start = combined.find(sents[i])
+                end = start + len(sents[i])-1
+                start_token_idx = encodings.char_to_token(start)
+                end_token_idx = encodings.char_to_token(end)
+                encodings['input_ids'][start_token_idx, end_token_idx+1] = [0]*(end_token_idx-start_token_idx)
+
+
         new_context_sents = []
         for i, sent in enumerate(sents):
             if i in k_idxs:
                 new_context.append(sent)
         new_context = ' '.join(new_context_sents)
-
+        inputs =
         new_example = dict(
             id=example.qid,
             context=new_context,
