@@ -11,6 +11,9 @@ MAX_PARAGRAPH_LEN = 400
 SWAP_STR = '***'
 PUNCT = [',','?','.']
 
+class MaskedSentenceRopes(Dataset):
+    pass
+
 class ROPES(Dataset):
     def __init__(self, args, tokenizer, file_path, eval=False):
         self.args = args
