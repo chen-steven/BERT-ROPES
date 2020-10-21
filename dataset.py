@@ -94,17 +94,7 @@ def convert_examples_to_masked_features(examples, tokenizer):
 
         question_tokens = tokenizer.tokenize(question)
         context_encoding = tokenizer(context)
-        if q_idx != -1:
-            start_position = encodings.char_to_token(i, q_idx)
-            end_position = encodings.char_to_token(i, q_idx + len(answer) - 1)
-            if start_position >= 512:
-                start_position = 0
-            if end_position >= 512:
-                end_position = 0
-            start_positions.append(start_position)
-            end_positions.append(end_position)
-        elif c_idx != -1:
-            
+        if c_idx != -1:
             start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
             end_position = context_encoding.char_to_token(c_idx + len(answer) - 1) + len(question_tokens) + 1
             if start_position >= 512:
@@ -113,6 +103,16 @@ def convert_examples_to_masked_features(examples, tokenizer):
                 end_position = 0
             start_positions.append(start_position)
             end_positions.append(end_position)
+        elif q_idx != -1:
+            start_position = encodings.char_to_token(i, q_idx)
+            end_position = encodings.char_to_token(i, q_idx + len(answer) - 1)
+            if start_position >= 512:
+                start_position = 0
+            if end_position >= 512:
+                end_position = 0
+            start_positions.append(start_position)
+            end_positions.append(end_position)
+
         else:
             print(context, question, answer)
             start_positions.append(0)
@@ -126,7 +126,7 @@ def convert_examples_to_masked_features(examples, tokenizer):
         for j in range(len(sents)):
             if j not in top_k:
                 start_pos = context.find(sents[j].strip())
-                if (len(sents[j].strip()) != len(sents[j])):
+                if len(sents[j].strip()) != len(sents[j]):
                     print(sents[j])
                 start_idx = context_encoding.char_to_token(start_pos) + len(question_tokens) + 1
                 end_idx = context_encoding.char_to_token(start_pos+len(sents[j].strip())-1) + len(question_tokens) + 1
