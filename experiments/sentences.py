@@ -25,24 +25,51 @@ class SentenceSelection:
             q_repr = q_repr.expand(s_repr.size(0), -1)
         return self.sim_func(s_repr, q_repr)
 
-    def get_k_most_similar(self, context, question, answer, k):
+    def get_k_most_similar(self, context, question, answer, k=None):
         sents = sent_tokenize(context)
         sim = self.get_similarity(sents, question+' '+answer)
         vals = [(val, i) for i,val in enumerate(sim)]
         vals.sort(reverse=True)
-        return sents, [i for _, i in vals[:k]]
+
+        if k:
+            return sents, [i for _, i in vals[:k]]
+        else:
+            return sents, [i for _, i in vals]
 
 
-def process(examples, path, k=5):
+def enforce_top_k_contains_answer(sents, idxs, answer, question, k):
+    if question.find(answer) != -1:
+        return idxs[:k]
+    for i in idxs[:k]:
+        if sents[i].find(answer) != -1:
+            return idxs[:k]
+        
+    for i in idxs[k:]:
+        if sents[i].find(answer) != -1:
+            new_idxs = idxs[:k]
+            new_idxs[-1] = i
+            return new_idxs
+
+    print(sents)
+    print(answer)
+    return idxs[:k]
+
+def process(examples, path, k=5, enforce_contains_answer=True):
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     s = SentenceSelection()
     processed_examples = []
     count = 0
     total = 0
     for example in tqdm(examples):
+        answer = example.answer.strip()
         total += 1
         context = example.context
-        sents, k_idxs = s.get_k_most_similar(context, example.question, example.answer, k)
+        sents, k_idxs = s.get_k_most_similar(context, example.question, example.answer.strip())
+
+        if enforce_contains_answer:
+            k_idxs = enforce_top_k_contains_answer(sents, k_idxs, answer, example.question, k)
+        else:
+            k_idxs = k_idxs[:k]
 
         new_example = dict(
             id=example.qas_id,

@@ -17,7 +17,7 @@ class MaskedSentenceRopes(Dataset):
         self.args = args
         self.eval = eval
         self.tokenizer = tokenizer
-        with open(file_path, 'w') as f:
+        with open(ROPES_DATA_PATH+file_path, 'r') as f:
             examples = json.load(f)
         self.examples = examples
         self.encodings = convert_examples_to_masked_features(examples, tokenizer)
@@ -25,7 +25,7 @@ class MaskedSentenceRopes(Dataset):
     def __getitem__(self, idx):
         inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
         if self.eval:
-            inputs['id'] = self.examples[idx].qas_id
+            inputs['id'] = self.examples[idx]['id']
         return inputs
 
     def __len__(self):
@@ -63,25 +63,34 @@ def convert_examples_to_masked_features(examples, tokenizer):
     features = []
     contexts, questions = [], []
     start_positions, end_positions = [], []
-
+    count = 0
+    counter = 0
+    count1 = 0
     for example in examples:
-        contexts.append(' '.join(example['sentences']))
-        questions.append(example['questions'])
+        contexts.append(' '.join(s.strip() for s in example['sentences']))
+        questions.append(example['question'])
 
     encodings = tokenizer(questions, contexts, padding=True, truncation=True)
     for i, example in tqdm(enumerate(examples)):
-        answer = example['answer']
+        answer = example['answer'].strip()
         context = contexts[i]
         question = questions[i]
         sents = example['sentences']
-        top_k = example['top_k_idxs']
+        top_k = example['top_k']
+        top_k.sort()
         q_idx = question.find(answer)
-        c_idx = context.find(answer)
+    
+        s = 0
+        for idx in top_k:
+            if sents[idx].find(answer) != -1:
+                s = context.find(sents[idx])
+                break
+        c_idx = context.find(answer, s)
 
-        while q_idx != -1 and q_idx + len(answer) < len(question) and question[q_idx + len(answer)].isalpha():
-            q_idx = question.find(answer, q_idx + 1)
-        while c_idx != -1 and c_idx + len(answer) < len(context) and context[c_idx + len(answer)].isalpha():
-            c_idx = context.find(answer, c_idx + 1)
+#        while q_idx != -1 and q_idx + len(answer) < len(question) and question[q_idx + len(answer)].isalpha():
+#            q_idx = question.find(answer, q_idx + 1)
+#        while c_idx != -1 and c_idx + len(answer) < len(context) and context[c_idx + len(answer)].isalpha():
+#            c_idx = context.find(answer, c_idx + 1)
 
         question_tokens = tokenizer.tokenize(question)
         context_encoding = tokenizer(context)
@@ -95,6 +104,7 @@ def convert_examples_to_masked_features(examples, tokenizer):
             start_positions.append(start_position)
             end_positions.append(end_position)
         elif c_idx != -1:
+            
             start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
             end_position = context_encoding.char_to_token(c_idx + len(answer) - 1) + len(question_tokens) + 1
             if start_position >= 512:
@@ -104,22 +114,41 @@ def convert_examples_to_masked_features(examples, tokenizer):
             start_positions.append(start_position)
             end_positions.append(end_position)
         else:
-            print(question, answer)
+            print(context, question, answer)
             start_positions.append(0)
             end_positions.append(0)
 
+        tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position+1])
+        if tmp != answer:
+            counter += 1
         # mask out sentences
+        mask_positions = []
         for j in range(len(sents)):
             if j not in top_k:
-                print('Masking sentence...')
-                start_pos = context.find(sents[i])
+                start_pos = context.find(sents[j].strip())
+                if (len(sents[j].strip()) != len(sents[j])):
+                    print(sents[j])
                 start_idx = context_encoding.char_to_token(start_pos) + len(question_tokens) + 1
-                end_idx = context_encoding.char_to_token(start_pos+len(sents[i])-1) + len(question_tokens) + 1
+                end_idx = context_encoding.char_to_token(start_pos+len(sents[j].strip())-1) + len(question_tokens) + 1
                 if (start_idx and end_idx) and (start_idx < 512 and end_idx < 512):
-                    encodings[i]['input_ids'][start_idx:end_idx+1] = [0]*(end_idx-start_idx)
-        encodings['start_positions'] = start_positions
-        encodings['end_positions'] = end_positions
-        return encodings
+                    mask_positions.append((start_idx, end_idx))
+                    if start_idx <= start_position <=end_idx:
+                        count1 += 1
+        for s, e in mask_positions:
+            encodings['input_ids'][i][s:e+1] = [0]*(e+1-s)
+
+        tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position+1])
+        if tmp != answer:
+#            if 'PAD' not in tmp:
+            count += 1
+#            print(tmp, answer)
+            
+    encodings['start_positions'] = start_positions
+    encodings['end_positions'] = end_positions
+    print('Total number of incorrectly decoded examples:', count)
+    print('Total number of incorrectly decoded examples (unmasked):', counter)
+    print('Definitive mask out answer:', count1)
+    return encodings
 
 
 def convert_examples_to_features(examples, tokenizer, questions, contexts, max_seq_length=512, doc_stride=1):
@@ -282,8 +311,10 @@ if __name__ == '__main__':
     args = O()
     args.use_augmented_examples=True
     args.use_multi_labels=True
-    dataset = ROPES(args, tokenizer,'train-v1.0.json')
-    print(dataset[0])
+    
+#    dataset = ROPES(args, tokenizer,'train-v1.0.json')
+    dataset = MaskedSentenceRopes(args, tokenizer, 'dev-top-sentences-contains-answer.json')
+    print(tokenizer.decode(dataset[114]['input_ids'].tolist()))
 
 
     #print('converting to features...')

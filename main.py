@@ -4,7 +4,7 @@ from transformers import (BertTokenizerFast, AutoModelForQuestionAnswering, Auto
                           get_linear_schedule_with_warmup)
 from torch.utils.data import DataLoader, RandomSampler
 import torch.nn.functional as F
-from dataset import ROPES
+from dataset import ROPES, MaskedSentenceRopes
 import utils
 import evaluate
 from tqdm import tqdm
@@ -140,22 +140,28 @@ def main():
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--learning-rate', default=5e-5,type=float)
+    parser.add_argument('--learning-rate', default=1e-5,type=float)
     parser.add_argument('--weight-decay', default=0.0, type=float)
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
-    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--epochs', default=4, type=int)
     parser.add_argument('--dev-batch-size', default=32, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     parser.add_argument('--use-augmented-examples', action="store_true")
     parser.add_argument('--use-multi-labels', action="store_true")
+    parser.add_argument('--use-masked-sentences', action="store_true")
     args = parser.parse_args()
     
     config = AutoConfig.from_pretrained(BERT_MODEL)
     tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
-    train_dataset = ROPES(args, tokenizer, 'train-v1.0.json')
-    dev_dataset = ROPES(args, tokenizer, 'dev-v1.0.json', eval=True)
+
+    if not args.use_masked_sentences:
+        train_dataset = ROPES(args, tokenizer, 'train-v1.0.json')
+        dev_dataset = ROPES(args, tokenizer, 'dev-v1.0.json', eval=True)
+    else:
+        train_dataset = MaskedSentenceRopes(args, tokenizer, 'train-top-sentences-contains-answer.json')
+        dev_dataset = MaskedSentenceRopes(args, tokenizer, 'dev-top-sentences-contains-answer.json', eval=True)
 
     utils.set_random_seed(args.seed)
 #    print(test(args, model, dev_dataset, tokenizer))
