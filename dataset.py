@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import json
 from tqdm import tqdm
 import torch
+import json
 from utils import ROPESExample, convert_idx
 from transformers import BasicTokenizer
 from transformers.data.processors.squad import squad_convert_examples_to_features, SquadExample
@@ -12,7 +13,23 @@ SWAP_STR = '***'
 PUNCT = [',','?','.']
 
 class MaskedSentenceRopes(Dataset):
-    pass
+    def __init__(self, args, tokenizer, file_path, eval=False):
+        self.args = args
+        self.eval = eval
+        self.tokenizer = tokenizer
+        with open(file_path, 'w') as f:
+            examples = json.load(f)
+        self.examples = examples
+        self.encodings = convert_examples_to_masked_features(examples, tokenizer)
+
+    def __getitem__(self, idx):
+        inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        if self.eval:
+            inputs['id'] = self.examples[idx].qas_id
+        return inputs
+
+    def __len__(self):
+        return len(self.examples)
 
 class ROPES(Dataset):
     def __init__(self, args, tokenizer, file_path, eval=False):
@@ -40,6 +57,70 @@ class ROPES(Dataset):
 
     def __len__(self):
         return len(self.examples)
+
+
+def convert_examples_to_masked_features(examples, tokenizer):
+    features = []
+    contexts, questions = [], []
+    start_positions, end_positions = [], []
+
+    for example in examples:
+        contexts.append(' '.join(example['sentences']))
+        questions.append(example['questions'])
+
+    encodings = tokenizer(questions, contexts, padding=True, truncation=True)
+    for i, example in tqdm(enumerate(examples)):
+        answer = example['answer']
+        context = contexts[i]
+        question = questions[i]
+        sents = example['sentences']
+        top_k = example['top_k_idxs']
+        q_idx = question.find(answer)
+        c_idx = context.find(answer)
+
+        while q_idx != -1 and q_idx + len(answer) < len(question) and question[q_idx + len(answer)].isalpha():
+            q_idx = question.find(answer, q_idx + 1)
+        while c_idx != -1 and c_idx + len(answer) < len(context) and context[c_idx + len(answer)].isalpha():
+            c_idx = context.find(answer, c_idx + 1)
+
+        question_tokens = tokenizer.tokenize(question)
+        context_encoding = tokenizer(context)
+        if q_idx != -1:
+            start_position = encodings.char_to_token(i, q_idx)
+            end_position = encodings.char_to_token(i, q_idx + len(answer) - 1)
+            if start_position >= 512:
+                start_position = 0
+            if end_position >= 512:
+                end_position = 0
+            start_positions.append(start_position)
+            end_positions.append(end_position)
+        elif c_idx != -1:
+            start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
+            end_position = context_encoding.char_to_token(c_idx + len(answer) - 1) + len(question_tokens) + 1
+            if start_position >= 512:
+                start_position = 0
+            if end_position >= 512:
+                end_position = 0
+            start_positions.append(start_position)
+            end_positions.append(end_position)
+        else:
+            print(question, answer)
+            start_positions.append(0)
+            end_positions.append(0)
+
+        # mask out sentences
+        for j in range(len(sents)):
+            if j not in top_k:
+                print('Masking sentence...')
+                start_pos = context.find(sents[i])
+                start_idx = context_encoding.char_to_token(start_pos) + len(question_tokens) + 1
+                end_idx = context_encoding.char_to_token(start_pos+len(sents[i])-1) + len(question_tokens) + 1
+                if (start_idx and end_idx) and (start_idx < 512 and end_idx < 512):
+                    encodings[i]['input_ids'][start_idx:end_idx+1] = [0]*(end_idx-start_idx)
+        encodings['start_positions'] = start_positions
+        encodings['end_positions'] = end_positions
+        return encodings
+
 
 def convert_examples_to_features(examples, tokenizer, questions, contexts, max_seq_length=512, doc_stride=1):
     #TODO: also return features with ROPESFeatures object

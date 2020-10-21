@@ -1,17 +1,20 @@
 import json
 import torch
+from tqdm import tqdm
 from nltk.tokenize import sent_tokenize
 from transformers import BertTokenizerFast, BertModel
 
 class SentenceSelection:
     def __init__(self):
         self.tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-        self.model = BertModel.from_pretrained('bert-base-cased', return_dict=True)
+        self.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+        self.model = BertModel.from_pretrained('bert-base-cased', return_dict=True).to(self.device)
         self.sim_func = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
 
     def _get_sentence_representation(self, sentences):
         with torch.no_grad():
             inputs = self.tokenizer(sentences, return_tensors="pt", padding=True, truncation=True)
+            inputs = {key: val.to(self.device) for key,val in inputs.items()}
             outputs = self.model(**inputs)
             return outputs.pooler_output
 
@@ -34,38 +37,23 @@ def process(examples, path, k=5):
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     s = SentenceSelection()
     processed_examples = []
-    for example in examples:
-        context = example.background + ' ' + example.situation
+    count = 0
+    total = 0
+    for example in tqdm(examples):
+        total += 1
+        context = example.context
         sents, k_idxs = s.get_k_most_similar(context, example.question, example.answer, k)
 
-        combined = ' '.join(sents)
-        encodings = tokenizer(combined)
-
-        # mask out sentences
-        for i in range(len(sents)):
-            if i not in k_idxs:
-                start = combined.find(sents[i])
-                end = start + len(sents[i])-1
-                start_token_idx = encodings.char_to_token(start)
-                end_token_idx = encodings.char_to_token(end)
-                encodings['input_ids'][start_token_idx, end_token_idx+1] = [0]*(end_token_idx-start_token_idx)
-
-
-        new_context_sents = []
-        for i, sent in enumerate(sents):
-            if i in k_idxs:
-                new_context.append(sent)
-        new_context = ' '.join(new_context_sents)
-        inputs =
         new_example = dict(
-            id=example.qid,
-            context=new_context,
+            id=example.qas_id,
+            sentences = sents,
+            top_k = k_idxs,
             question=example.question,
             answer=example.answer
         )
-
+        
         processed_examples.append(new_example)
-
+   # print(count, total, len(processed_examples))
     with open(path, 'w') as f:
         json.dump(processed_examples, f)
 
