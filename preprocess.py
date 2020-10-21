@@ -8,8 +8,13 @@ def main(args):
         examples, _, _ = get_examples('train-v1.0.json')
     else:
         examples, _, _ = get_examples('dev-v1.0.json')
-        
-    process(examples, f'data/ropes/{args.file_name}.json', k=args.k, enforce_contains_answer=args.enforce_contains_answer)
+
+    if args.p:
+        process(examples, f'data/ropes/{args.file_name}.json', p=args.p,
+                enforce_contains_answer=args.enforce_contains_answer)
+    else:
+        process(examples, f'data/ropes/{args.file_name}.json', k=args.k,
+                enforce_contains_answer=args.enforce_contains_answer)
 
 
 if __name__ == '__main__':
@@ -17,8 +22,13 @@ if __name__ == '__main__':
     parser.add_argument('--file-name', type=str, required=True)
     parser.add_argument('--train', action="store_true")
     parser.add_argument('--k', type=int, default=5)
+    parser.add_argument('--p', type=int, default=None)
     parser.add_argument('--enforce-contains-answer', action="store_true")
 
     args = parser.parse_args()
+    if args.p:
+        print('Using p=',args.p)
+    else:
+        print('using k=',args.k)
     print(args.train, args.k, args.file_name)
     main(args)

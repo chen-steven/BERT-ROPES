@@ -1,5 +1,6 @@
 import json
 import torch
+import math
 from tqdm import tqdm
 from nltk.tokenize import sent_tokenize
 from transformers import BertTokenizerFast, BertModel
@@ -54,7 +55,7 @@ def enforce_top_k_contains_answer(sents, idxs, answer, question, k):
     print(answer)
     return idxs[:k]
 
-def process(examples, path, k=5, enforce_contains_answer=True):
+def process(examples, path, k=5, enforce_contains_answer=True, p=None):
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     s = SentenceSelection()
     processed_examples = []
@@ -66,6 +67,8 @@ def process(examples, path, k=5, enforce_contains_answer=True):
         context = example.context
         sents, k_idxs = s.get_k_most_similar(context, example.question, example.answer.strip())
 
+        if p:
+            k = math.ceil(p*len(sents))
         if enforce_contains_answer:
             k_idxs = enforce_top_k_contains_answer(sents, k_idxs, answer, example.question, k)
         else:
