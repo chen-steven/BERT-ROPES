@@ -44,7 +44,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
 #    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
  #                                               num_training_steps=len(train_dataloader)*args.epochs)
     model.zero_grad()
-    #epoch_iterator = tqdm(train_dataloader, desc="Iteration")
+
     best_em, best_f1 = -1, -1
     for i in range(args.epochs):
         epoch_iterator = tqdm(train_dataloader, desc="Iteration")
@@ -54,7 +54,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
 
             outputs = model(**batch)
             loss = outputs[0]
-            #print(loss.item())
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
@@ -70,8 +70,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
         logger.info(f"***** Evaluation for epoch {i+1} *****")
         logger.info(f"EM: {dev_em}, F1: {dev_f1}, loss: {dev_loss}")
         logger.info(f"Contrast EM: {c_em}, contrast F1: {c_f1}, contrast loss: {c_loss}")
-#        print('EM', dev_em, 'F1', dev_f1, 'loss',dev_loss)
-#        print('Contrast EM', c_em, 'Contrast F1', c_f1, 'Contrast loss', c_loss)
+
     return best_em
 
 def test(args, model, dev_dataset, tokenizer, contrast=False):
@@ -81,19 +80,15 @@ def test(args, model, dev_dataset, tokenizer, contrast=False):
     dev_dataloader = DataLoader(dev_dataset, batch_size=args.dev_batch_size)
     dev_iterator = tqdm(dev_dataloader)
     total_loss = 0
-    keys = ['input_ids', 'attention_mask', 'token_type_ids', 'start_positions', 'end_positions']
-    predictions = {}
+
     answers = {}
     for step, batch in enumerate(dev_iterator):
-     #   print(batch)
+
         qids = batch['id']
         del batch['id']
         for key in batch:
             batch[key] = batch[key].to(args.gpu)
-#        print(batch)
-        #batch['return_dict'] = True
-        #qids = batch['id']
-        #del batch['id']
+
         with torch.no_grad():
             outputs = model(**batch)
             loss = outputs[0]
@@ -104,24 +99,10 @@ def test(args, model, dev_dataset, tokenizer, contrast=False):
         for i in range(batch_size):
             s, e = start_idxs[i], end_idxs[i]
             answers[qids[i]] = tokenizer.decode(batch['input_ids'][i].tolist()[s:e+1])
-            # predictions[qids[i]] = evaluate.ROPESResult(qids[i],
-            #                                            outputs['start_logits'][i],
-            #                                            outputs['end_logits'][i],
-            #                                            batch['input_ids'][i])
         
-
+    # Compute EM and F1 on predictions
     res = evaluate.main(answers, tokenizer, contrast=contrast)
     return total_loss, res['exact_match'], res['f1']
-
-def trainer(args, model, dataset, dev_dataset, tokenizer):
-    seeds = [10, 20, 30]
-    ems = []
-    for seed in seeds:
-        args.seed = seed
-        utils.set_random_seed(seed)
-        best_em = train(args, model, dataset, dev_dataset, tokenizer)
-        ems.append(best_em)
-    print(sum(ems)/len(ems))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -136,6 +117,7 @@ def main():
     parser.add_argument('--dev-batch-size', default=32, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     args = parser.parse_args()
+
     utils.set_random_seed(args.seed)
     config = AutoConfig.from_pretrained(BERT_MODEL)
     tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
@@ -144,8 +126,6 @@ def main():
     dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
     contrast_dataset = ROPES(tokenizer, 'ropes_contrast_set_original_032820.json', eval=True)
 
-#    utils.set_random_seed(args.seed)
-#    print(test(args, model, dev_dataset, tokenizer))
     train(args, model, train_dataset, dev_dataset, tokenizer, contrast_dataset=contrast_dataset)
 
 if __name__ == '__main__':
