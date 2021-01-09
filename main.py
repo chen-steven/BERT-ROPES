@@ -62,7 +62,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
   #          scheduler.step()
             model.zero_grad()
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
-   
+
         model.train()
         if dev_em > best_em:
             best_em = dev_em
