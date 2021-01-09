@@ -165,8 +165,8 @@ def convert_to_predictions(predictions, tokenizer):
 
 
 
-def main(predictions, tokenizer):
-    with open('data/ropes/dev-v1.0.json', 'r') as f:
+def main(predictions, tokenizer, contrast=False):
+    with open('data/ropes/ropes_contrast_set_original_032820.json' if contrast else 'data/ropes/dev-v1.0.json', 'r') as f:
         data = json.load(f)
 
     #ans_predictions = convert_to_predictions(predictions, tokenizer)

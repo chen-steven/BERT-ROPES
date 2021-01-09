@@ -78,7 +78,7 @@ def get_examples(file_path):
             for para in article['paragraphs']:
                 background = para['background']
                 situation = para['situation']
-                context = background + ' ' + situation
+                context = background#background + ' ' + situation
                 for qa in para['qas']:
                     id = qa['id']
                     question = qa['question']
@@ -89,7 +89,7 @@ def get_examples(file_path):
                         if q_idx != -1:
                             start_position = q_idx
                         else:
-                            start_position = sit_idx + len(background) + 1
+                            start_position = sit_idx #+ len(background) + 1
                         #example = SquadExample(id, question, context, answer, start_position, 'test')
                         example = ROPESExample(id, question, context, answer.strip(), start_position)
                         examples.append(example)
