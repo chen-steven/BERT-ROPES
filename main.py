@@ -62,14 +62,12 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
   #          scheduler.step()
             model.zero_grad()
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
-        if contrast_dataset is not None:
-            c_loss, c_em, c_f1 = test(args, model, contrast_dataset, tokenizer, contrast=True)
+   
         model.train()
         if dev_em > best_em:
             best_em = dev_em
         logger.info(f"***** Evaluation for epoch {i+1} *****")
         logger.info(f"EM: {dev_em}, F1: {dev_f1}, loss: {dev_loss}")
-        logger.info(f"Contrast EM: {c_em}, contrast F1: {c_f1}, contrast loss: {c_loss}")
 
     return best_em
 
@@ -124,9 +122,8 @@ def main():
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
     train_dataset = ROPES(tokenizer, 'train-v1.0.json')
     dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
-    contrast_dataset = ROPES(tokenizer, 'ropes_contrast_set_original_032820.json', eval=True)
 
-    train(args, model, train_dataset, dev_dataset, tokenizer, contrast_dataset=contrast_dataset)
+    train(args, model, train_dataset, dev_dataset, tokenizer)
 
 if __name__ == '__main__':
     main()
