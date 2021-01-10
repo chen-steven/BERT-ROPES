@@ -5,6 +5,10 @@ import json
 import torch
 from tqdm import tqdm
 
+SPLIT_MAP = {'train': 'data/ropes/train-v1.0.json',
+             'dev': 'data/ropes/dev-v1.0.json',
+             'contrast': 'data/ropes/ropes_contrast_set_original_032820.json'}
+
 class ROPESResult:
     def __init__(self, qid, start_logits, end_logits, input_ids):
         self.qid = qid
@@ -163,10 +167,9 @@ def convert_to_predictions(predictions, tokenizer):
     return ans_predictions
 
 
+def main(predictions, tokenizer, split='dev'):
 
-
-def main(predictions, tokenizer, contrast=False):
-    with open('data/ropes/ropes_contrast_set_original_032820.json' if contrast else 'data/ropes/dev-v1.0.json', 'r') as f:
+    with open(SPLIT_MAP[split], 'r') as f:
         data = json.load(f)
 
     #ans_predictions = convert_to_predictions(predictions, tokenizer)
