@@ -114,7 +114,7 @@ def test(args, model, dev_dataset, tokenizer):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", default="train/hotpot10", type=str)
-    parser.add_argument("--batch-size", default=12, type=int)
+    parser.add_argument("--batch-size", default=8, type=int)
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--seed', default=10, type=int)
     parser.add_argument('--learning-rate', default=3e-5, type=float)
@@ -122,7 +122,7 @@ def main():
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
     parser.add_argument('--epochs', default=3, type=int)
-    parser.add_argument('--dev-batch-size', default=12, type=int)
+    parser.add_argument('--dev-batch-size', default=16, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     args = parser.parse_args()
 
