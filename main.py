@@ -67,6 +67,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
         model.train()
         if dev_em > best_em:
             best_em = dev_em
+            torch.save(model.state_dict(), f"checkpoints/{args.save_file}.tar")
         logger.info(f"***** Evaluation for epoch {i+1} *****")
         logger.info(f"EM: {dev_em}, F1: {dev_f1}, loss: {dev_loss}")
         logger.info(f"Contrast EM: {c_em}, contrast F1: {c_f1}, contrast loss: {c_loss}")
@@ -135,11 +136,16 @@ def main():
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--dev-batch-size', default=32, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
+    parser.add_argument('--save-file', default='checkpoint', type=str)
+    parser.add_argument('--checkpoint', default=None, type=str)
     args = parser.parse_args()
     utils.set_random_seed(args.seed)
     config = AutoConfig.from_pretrained(BERT_MODEL)
     tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
+
+    if args.checkpoint is not None:
+        model.load_state_dict(torch.load(args.checkpoint, map_location="cpu"))
     train_dataset = ROPES(tokenizer, 'train-v1.0.json')
     dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
     contrast_dataset = ROPES(tokenizer, 'ropes_contrast_set_original_032820.json', eval=True)
