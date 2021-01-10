@@ -70,6 +70,7 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
 
 
 def get_examples(file_path):
+    print("Getting examples...")
     examples, questions, contexts = [], [], []
     with open(f'{ROPES_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
         data = json.load(f)
