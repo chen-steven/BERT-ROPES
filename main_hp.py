@@ -41,8 +41,8 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0}
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
-                                                num_training_steps=len(train_dataloader)*args.epochs)
+    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
+    #                                             num_training_steps=len(train_dataloader)*args.epochs)
     model.zero_grad()
 
     best_em, best_f1 = -1, -1
@@ -59,7 +59,7 @@ def train(args, model, dataset, dev_dataset, tokenizer):
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
             optimizer.step()
-            scheduler.step()
+            # scheduler.step()
             model.zero_grad()
 
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
@@ -113,11 +113,11 @@ def test(args, model, dev_dataset, tokenizer):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", default="train/hotpot10", type=str)
+    parser.add_argument("--output_dir", default="train/hotpot10_1e5", type=str)
     parser.add_argument("--batch-size", default=8, type=int)
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--seed', default=10, type=int)
-    parser.add_argument('--learning-rate', default=3e-5, type=float)
+    parser.add_argument('--learning-rate', default=1e-5, type=float)
     parser.add_argument('--weight-decay', default=0.0, type=float)
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)

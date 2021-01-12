@@ -113,13 +113,13 @@ def get_raw_scores(dataset, predictions):
         if article["answer"] in ["yes", "no"]:
             continue
         total += 1
-        if article['id'] not in predictions:
-            message = 'Unanswered question ' + article['id'] + \
+        if article['_id'] not in predictions:
+            message = 'Unanswered question ' + article['_id'] + \
                       ' will receive score 0.'
             # print(message, file=sys.stderr)
             continue
         ground_truths = [article['answer']]
-        prediction = predictions[article['id']]
+        prediction = predictions[article['_id']]
         exact_match += metric_max_over_ground_truths(
             compute_exact, prediction, ground_truths)
         f1 += metric_max_over_ground_truths(
@@ -176,9 +176,10 @@ def main(predictions, tokenizer):
         data = json.load(f)
 
     # ans_predictions = convert_to_predictions(predictions, tokenizer)
-    return get_raw_scores(data['data'], predictions)
+    return get_raw_scores(data, predictions)
 
 
 if __name__ == '__main__':
-    print(normalize_answer("12,13"))
-    print(normalize_answer("12, 13"))
+    with open('data/hotpot/hotpot_dev_distractor_v1.json', 'r') as f:
+        data = json.load(f)
+    print(data[0]['_id'])
