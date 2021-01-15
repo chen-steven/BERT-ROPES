@@ -109,7 +109,9 @@ def test(args, model, dev_dataset, tokenizer):
             batch[key] = batch[key].to(args.gpu)
 
         with torch.no_grad():
-            outputs = model(**batch)
+            input_batch = {t: batch[t] for t in batch if t not in ["start_labels", "end_labels"]}
+            outputs = model(**input_batch)
+
             if args.binary:
                 start_logits, end_logits = outputs[1], outputs[2]
                 loss = binary_cross_entropy(start_logits, batch["start_labels"]) + \
