@@ -33,6 +33,8 @@ class BertForQAandMLM(BertPreTrainedModel):
         return_dict=None,
         mask_labels=None,
         mask_inputs=None,
+        mask_type_ids=None,
+        mask_attention_mask=None,
         qa=True
     ):
         r"""
@@ -98,8 +100,8 @@ class BertForQAandMLM(BertPreTrainedModel):
         else:
             outputs = self.bert(
                 mask_inputs,
-                attention_mask=attention_mask,
-                token_type_ids=token_type_ids,
+                attention_mask=mask_attention_mask,
+                token_type_ids=mask_type_ids,
                 position_ids=position_ids,
                 head_mask=head_mask,
                 inputs_embeds=inputs_embeds,

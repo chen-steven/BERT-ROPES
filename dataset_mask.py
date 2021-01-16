@@ -141,12 +141,14 @@ def convert_examples_to_features(examples, tokenizer, questions, qas, contexts,
             mask_labels.append(mask_label)
             mask_input = mask_encodings["input_ids"][i]
             mask_inputs.append(mask_input)
-        assert len(mask_label) == len(mask_input)
+        assert len(mask_label) == len(mask_input) == len(mask_encodings["input_ids"][i])
 
     encodings['start_positions'] = start_positions
     encodings['end_positions'] = end_positions
     encodings['mask_inputs'] = mask_inputs
     encodings['mask_labels'] = mask_labels
+    encodings['mask_type_ids'] = mask_encodings["token_type_ids"]
+    encodings['mask_attention_mask'] = mask_encodings["attention_mask"]
     return encodings
 
 
