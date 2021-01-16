@@ -69,14 +69,15 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             optimizer.step()
             #          scheduler.step()
             model.zero_grad()
+
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
-        logger.info(f"***** EM:{best_em} F1:{best_f1} *****")
+        logger.info(f"***** EM:{dev_em} F1:{dev_f1} *****")
 
         model.train()
         if dev_em > best_em:
             best_em = dev_em
             best_f1 = dev_f1
-            _, contrast_em, contrast_f1 = test(args, model, contrast_dataset, tokenizer)
+            _, contrast_em, contrast_f1 = test(args, model, contrast_dataset, tokenizer, contrast=True)
             logger.info(f"***** Best Checkpoint EM:{best_em} F1:{best_f1}, "
                         f"Contrast EM:{contrast_em} F1:{contrast_f1} Saving... *****")
             checkpoint = {'args': args.__dict__, 'model': model.cpu()}

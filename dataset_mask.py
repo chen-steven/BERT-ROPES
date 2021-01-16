@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased', cache_dir="./cache")
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-    ROPES(tokenizer, 'ropes_labeled_chains_combined_train_examples.json')
+    ROPES(tokenizer, 'ropes_no_coref_dev_combined_examples.json')
     # print('converting to features...')
     # convert_examples_to_features(examples, tokenizer, questions, contexts )
 
