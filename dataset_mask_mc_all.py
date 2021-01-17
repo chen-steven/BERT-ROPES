@@ -2,8 +2,8 @@ from torch.utils.data import Dataset
 import json
 from tqdm import tqdm
 import torch
-from datetime import datetime
 import numpy as np
+from datetime import datetime
 from utils import ROPESExample
 from transformers.data.processors.squad import squad_convert_examples_to_features, SquadExample
 import nltk
@@ -67,24 +67,22 @@ def convert_examples_to_features(examples, tokenizer, qas1, qas2, contexts):
         answer_labels.append(example.answer_label)
         for j in range(2):
             qa_tokens = tokenizer.tokenize(qas[j])
-            answer_subsent = answer_subsents[j]
             encodings = qas_encodings[j]
 
-            if answer_subsent is not None:
-                ac_idx = context.find(answer_subsent)
-                ac_start = context_encoding.char_to_token(ac_idx)
-                ac_end = context_encoding.char_to_token(ac_idx + len(answer_subsent) - 1)
+            mask_label = [-100] * len(encodings["input_ids"][i])
+            mask_input = encodings["input_ids"][i]
 
-                as_start1 = ac_start + len(qa_tokens) + 1
-                as_end1 = ac_end + len(qa_tokens) + 1
-                mask_label = [-100] * as_start1 + encodings["input_ids"][i][as_start1:as_end1+1] + \
-                             [-100] * (len(encodings["input_ids"][i]) - as_end1 - 1)
-                mask_input = encodings["input_ids"][i][:as_start1] + \
-                             [tokenizer.encode("[MASK]")[1]] * (as_end1 + 1 - as_start1) + \
-                             encodings["input_ids"][i][as_end1+1:]
-            else:
-                mask_label = [-100] * len(encodings["input_ids"][i])
-                mask_input = encodings["input_ids"][i]
+            for answer_subsent in answer_subsents:
+                if answer_subsent is not None:
+                    ac_idx = context.find(answer_subsent)
+                    ac_start = context_encoding.char_to_token(ac_idx)
+                    ac_end = context_encoding.char_to_token(ac_idx + len(answer_subsent) - 1)
+
+                    as_start = ac_start + len(qa_tokens) + 1
+                    as_end = ac_end + len(qa_tokens) + 1
+                    mask_label[as_start:as_end+1] = encodings["input_ids"][i][as_start:as_end+1]
+                    mask_input[as_start:as_end+1] = [tokenizer.encode("[MASK]")[1]] * (as_end + 1 - as_start)
+
             assert len(mask_label) == len(mask_input)
             qas_mask_labels[j].append(mask_label)
             qas_mask_inputs[j].append(mask_input)
@@ -203,7 +201,8 @@ if __name__ == '__main__':
 
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased', cache_dir="./cache")
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-    ROPES(tokenizer, 'ropes_no_coref_dev_combined_examples.json', 'dev_processed_candidate_answers.json')
+    ROPES(tokenizer, 'ropes_no_coref_dev_combined_examples.json', 'dev_processed_candidate_answers.json',
+          find_mask="label2")
     # print('converting to features...')
     # convert_examples_to_features(examples, tokenizer, questions, contexts )
 

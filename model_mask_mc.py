@@ -122,7 +122,8 @@ class BertForQAandMLM(BertPreTrainedModel):
                 logits = logits.unsqueeze(dim=1)
                 batch_size2, _ = logits.size()
                 logits0, logits1 = torch.split(logits, [batch_size2 // 2, batch_size2 // 2], dim=0)
-                reshaped_logits = torch.cat([logits0, logits1], dim=1)
+                # negative loss as logits, the higher the better
+                reshaped_logits = torch.cat([-logits0, -logits1], dim=1)
                 mask = logits0.bool().long()
                 loss = (loss_fct(reshaped_logits, answer_labels) * mask).sum() / (mask.sum() + 1e-12)
 
