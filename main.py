@@ -117,13 +117,14 @@ def main():
     args = parser.parse_args()
 
     utils.set_random_seed(args.seed)
-    config = AutoConfig.from_pretrained(BERT_MODEL)
-    tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
-    model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
+    config = AutoConfig.from_pretrained(BERT_MODEL, cache_dir="./cache")
+    tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL, cache_dir="./cache")
+    model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config, cache_dir="./cache")
     train_dataset = ROPES(tokenizer, 'train-v1.0.json')
     dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
 
     train(args, model, train_dataset, dev_dataset, tokenizer)
+
 
 if __name__ == '__main__':
     main()

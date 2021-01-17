@@ -35,7 +35,7 @@ def normalize_answer(s):
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return "".join(ch if ch not in exclude else ' ' for ch in text)
+        return "".join(ch if ch not in exclude else ' ' for ch in text).strip()
 
     def lower(text):
         return text.lower()

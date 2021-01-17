@@ -27,6 +27,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
     logger.info(f"  Using device = {device}")
     logger.info(f"  Batch size = {args.batch_size}")
     logger.info(f"  Using random seed = {args.seed}")
+    logger.info(f"  Gradient accumulation steps = {args.gradient_accumulation_steps}")
 
     model.to(device)
     model.train()
@@ -42,8 +43,8 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0}
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
-    #                                             num_training_steps=len(train_dataloader)*args.epochs)
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.num_warmup_steps,
+                                                num_training_steps=len(train_dataloader)*args.epochs)
     model.zero_grad()
 
     best_em, best_f1, contrast_em, contrast_f1 = -1, -1, -1, -1
@@ -64,14 +65,15 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             loss = (1 - args.mixing_ratio) * qa_loss + args.mixing_ratio * mlm_loss
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
-            optimizer.step()
-            #          scheduler.step()
-            model.zero_grad()
+            if (step + 1) % args.gradient_accumulation_steps == 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                optimizer.step()
+                scheduler.step()
+                model.zero_grad()
 
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
-        logger.info(f"***** EM:{dev_em} F1:{dev_f1} *****")
+        logger.info(f"***** EM:{dev_em} F1:{dev_f1} loss: {dev_loss} *****")
 
         model.train()
         if dev_em > best_em:
@@ -126,15 +128,16 @@ def main():
     parser.add_argument("--batch-size", default=4, type=int)
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--seed', default=10, type=int)
-    parser.add_argument('--learning-rate', default=1e-5, type=float)
+    parser.add_argument('--learning-rate', default=3e-5, type=float)
     parser.add_argument('--weight-decay', default=0.0, type=float)
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
     parser.add_argument('--epochs', default=10, type=int)
-    parser.add_argument('--dev-batch-size', default=4, type=int)
+    parser.add_argument('--dev-batch-size', default=8, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     parser.add_argument('--mixing_ratio', default=0.5, type=float)
     parser.add_argument('--find_mask', default="label", type=str)
+    parser.add_argument('--gradient_accumulation_steps', default=2, type=int)
     args = parser.parse_args()
 
     utils.set_random_seed(args.seed)

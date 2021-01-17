@@ -116,8 +116,7 @@ def convert_examples_to_features(examples, tokenizer, questions, qas, contexts,
             end_position = 0
         tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position + 1])
         if tmp != answer and start_position < 512 and end_position < 512:
-            # print(tmp, answer)
-            pass
+            print(tmp, answer)
         if start_position >= 512:
             start_position = 0
         if end_position >= 512:
