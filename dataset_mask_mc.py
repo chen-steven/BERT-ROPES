@@ -33,7 +33,7 @@ class ROPES(Dataset):
         self.tokenizer = tokenizer
         self.eval = eval
         examples, questions, qas, contexts, evaluation_file = get_examples(file_path, answer_file_path,
-                                                                           find_mask=find_mask)
+                                                                           find_mask=find_mask, eval=eval)
         self.evaluation_file = evaluation_file
         self.examples = examples
         self.encodings = convert_examples_to_features(examples, tokenizer, questions, qas, contexts)
