@@ -109,9 +109,12 @@ def get_examples(file_path, answer_file_path, find_mask="label", eval=False):
             id = article["id"]
             question = article["question"]
             answers, answer_label = data_answers[id]
-            if answer_label == -1 and not eval:
-                answer = article["answer"].strip()
-                answers[0], answer_label = answer, 0
+            if answer_label == -1:
+                if not eval:
+                    answer = article["answer"].strip()
+                    answers[0], answer_label = answer, 0
+                else:
+                    answer_label = 0
             # shuffle answers
             np.random.seed(42)
             if np.random.random() > 0.5:
