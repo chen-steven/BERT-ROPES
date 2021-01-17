@@ -32,7 +32,9 @@ class ROPES(Dataset):
     def __init__(self, tokenizer, file_path, answer_file_path, eval=False, find_mask="label"):
         self.tokenizer = tokenizer
         self.eval = eval
-        examples, questions, qas, contexts = get_examples(file_path, answer_file_path, find_mask=find_mask)
+        examples, questions, qas, contexts, evaluation_file = get_examples(file_path, answer_file_path,
+                                                                           find_mask=find_mask)
+        self.evaluation_file = evaluation_file
         self.examples = examples
         self.encodings = convert_examples_to_features(examples, tokenizer, questions, qas, contexts)
 
@@ -49,14 +51,19 @@ class ROPES(Dataset):
 def convert_examples_to_features(examples, tokenizer, qas1, qas2, contexts):
     # TODO: also return features with ROPESFeatures object
     # features = []
-    qas_encodings = [tokenizer(qas1, contexts, padding=True, truncation=True),
-                     tokenizer(qas2, contexts, padding=True, truncation=True)]
-    qas_mask_labels, qas_mask_inputs = [[], []], [[], []]
+    all_qas_encodings = tokenizer(qas1 + qas2, contexts + contexts, padding=True, truncation=True)
+    qas_encodings = [{}, {}]
+    for key in all_qas_encodings:
+        length = len(all_qas_encodings[key]) // 2
+        qas_encodings[0][key] = all_qas_encodings[key][:length]
+        qas_encodings[1][key] = all_qas_encodings[key][length:]
+    qas_mask_labels, qas_mask_inputs, answer_labels = [[], []], [[], []], []
     for i, example in tqdm(enumerate(examples)):
         qas = example.qas
         context = example.context
         answer_subsents = example.answer_subsents
         context_encoding = tokenizer(context)
+        answer_labels.append(example.answer_label)
         for j in range(2):
             qa_tokens = tokenizer.tokenize(qas[j])
             answer_subsent = answer_subsents[j]
@@ -87,6 +94,7 @@ def convert_examples_to_features(examples, tokenizer, qas1, qas2, contexts):
             encodings[f"{key}{i}"] = qas_encodings[i][key]
         encodings[f'mask_inputs{i}'] = qas_mask_inputs[i]
         encodings[f'mask_labels{i}'] = qas_mask_labels[i]
+    encodings["answer_labels"] = answer_labels
     return encodings
 
 
@@ -109,10 +117,6 @@ def get_examples(file_path, answer_file_path, find_mask="label", eval=False):
             if np.random.random() > 0.5:
                 answers = [answers[1], answers[0]]
                 answer_label = 1 if answer_label == 0 else 0
-
-            print(answer)
-            print(answers)
-            print(answer_label)
 
             context_sent = article["context_sent"]
             situation_length = len(sent_tokenize(article["situation"]))
@@ -172,7 +176,9 @@ def get_examples(file_path, answer_file_path, find_mask="label", eval=False):
                     answer_subsent = answer_subsent.strip()
                 answer_subsents.append(answer_subsent)
 
-            print(answer_subsents)
+            if None in answer_subsents:
+                answer_subsents = [None, None]
+
             context = ' '.join(context_sent)
             example = ROPESMaskExample(id, question, context, answers, answer_subsents, answer_label)
             examples.append(example)
@@ -181,10 +187,11 @@ def get_examples(file_path, answer_file_path, find_mask="label", eval=False):
             contexts.append(context)
             evaluate_answers[id] = answers
 
-    with open(f"{ROPES_DATA_PATH}evaluate_{answer_file_path}", 'w') as f:
+    evaluate_answer_file_path = f"{ROPES_DATA_PATH}evaluate_{answer_file_path}"
+    with open(evaluate_answer_file_path, 'w') as f:
         json.dump(evaluate_answers, f)
 
-    return examples, qas1, qas2, contexts
+    return examples, qas1, qas2, contexts, evaluate_answer_file_path
 
 
 if __name__ == '__main__':
