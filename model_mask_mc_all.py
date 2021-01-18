@@ -84,9 +84,10 @@ class BertForQAandMLM(BertPreTrainedModel):
             logits = logits.unsqueeze(dim=1)
             batch_size2, _ = logits.size()
             logits0, logits1 = torch.split(logits, [batch_size2 // 2, batch_size2 // 2], dim=0)
-            reshaped_logits = torch.cat([-logits0, -logits1], dim=1)
-            mask = logits0.bool().long()
-            loss = (loss_fct(reshaped_logits, answer_labels) * mask).sum() / (mask.sum() + 1e-12)
+            reshaped_logits = torch.cat([-logits0, -logits1], dim=1).reshape(-1)
+            index = torch.arange(0, batch_size2 // 2).cuda() * 2
+            difference = reshaped_logits[index + answer_labels] - reshaped_logits[index + 1 - answer_labels]
+            loss = torch.max(0.5 - difference, torch.zeros_like(difference).cuda()).mean()
 
         if not return_dict:
             output = (reshaped_logits,) + outputs[2:]

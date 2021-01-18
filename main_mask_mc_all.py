@@ -51,6 +51,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
     best_em, best_f1, contrast_em, contrast_f1 = -1, -1, -1, -1
     for i in range(args.epochs):
         epoch_iterator = tqdm(train_dataloader, desc="Iteration")
+        total_loss, total = 0, 0
         for step, batch in enumerate(epoch_iterator):
             for t in batch:
                 batch[t] = batch[t].to(args.gpu)
@@ -60,6 +61,8 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             outputs = model(**batch)
             mlm_loss = outputs[0]
             loss = mlm_loss
+            total_loss += loss.item()
+            total += 1
 
             loss.backward()
 
@@ -70,7 +73,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
                 model.zero_grad()
 
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
-        logger.info(f"***** EM:{dev_em} F1:{dev_f1} loss: {dev_loss} *****")
+        logger.info(f"***** EM:{dev_em} F1:{dev_f1} loss: {total_loss / total} *****")
 
         model.train()
         if dev_em > best_em:

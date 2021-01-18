@@ -19,8 +19,8 @@ def tune_mc():
 
 def tune_mc_all():
     for label in ["label2"]:
-        os.system(f"mkdir train/ropes10_{label}_mc_all")
-        os.system(f"python main_mask_mc_all.py --output_dir train/ropes10_{label}_mc_all "
+        os.system(f"mkdir train/ropes10_{label}_mc_all1")
+        os.system(f"python main_mask_mc_all.py --output_dir train/ropes10_{label}_mc_all1 "
                   f" --find_mask {label} ")
 
 
