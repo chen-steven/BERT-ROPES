@@ -12,8 +12,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BERT_MODEL = "bert-base-cased"
-#BERT_MODEL = "roberta-large"
+#BERT_MODEL = "bert-base-cased"
+BERT_MODEL = "roberta-large"
 
 
 def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
@@ -56,9 +56,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             start_labels = start_labels.to(args.gpu)
             end_labels = end_labels.to(args.gpu)
             outputs = model(**batch)
-            loss = outputs[0]
-#            loss = utils.binary_cross_entropy(outputs[1], start_labels) + utils.binary_cross_entropy(outputs[2], end_labels)
-            #print(loss.item())
+            loss = outputs[0] if args.loss_fn == 'ce' else utils.binary_cross_entropy(outputs[1], start_labels) + utils.binary_cross_entropy(outputs[2], end_labels)
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
@@ -67,6 +65,8 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
   #          scheduler.step()
             model.zero_grad()
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
+        if contrast_dataset is not None:
+            c_loss, c_em, c_f1 = test(args, model, contrast_dataset, tokenizer, contrast=True)
 
         model.train()
         if dev_em > best_em:
@@ -74,6 +74,7 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             torch.save(model.state_dict(), f"checkpoints/{args.save_file}.tar")
         logger.info(f"***** Evaluation for epoch {i+1} *****")
         logger.info(f"EM: {dev_em}, F1: {dev_f1}, loss: {dev_loss}")
+        logger.info(f"Contrast EM: {c_em}, contrast F1: {c_f1}, contrast loss: {c_loss}")
 
     return best_em
 
@@ -125,6 +126,7 @@ def main():
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     parser.add_argument('--save-file', default='checkpoint1', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--loss-fn', choices=['ce', 'bce'], default='ce', type=str)
     args = parser.parse_args()
 
     utils.set_random_seed(args.seed)
@@ -136,8 +138,9 @@ def main():
         model.load_state_dict(torch.load(args.checkpoint, map_location="cpu"))
     train_dataset = ROPES(tokenizer, 'train-v1.0.json')
     dev_dataset = ROPES(tokenizer, 'dev-v1.0.json', eval=True)
+    contrast_dataset = ROPES(tokenizer, 'ropes_contrast_set_original_032820.json', eval=True)
 
-    train(args, model, train_dataset, dev_dataset, tokenizer)
+    train(args, model, train_dataset, dev_dataset, tokenizer, contrast_dataset=contrast_dataset)
 
 if __name__ == '__main__':
     main()
