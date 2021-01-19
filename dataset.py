@@ -14,13 +14,13 @@ class ROPES(Dataset):
         self.eval = eval
         examples, questions, contexts = get_examples(file_path)
         self.examples = examples
-        self.encodings = convert_examples_to_features(examples, tokenizer, questions, contexts)
+        self.encodings, self.start_labels, self.end_labels = convert_examples_to_features(examples, tokenizer, questions, contexts)
 
     def __getitem__(self, idx):
         inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
         if self.eval:
             inputs['id'] = self.examples[idx].qas_id
-        return inputs
+        return inputs, torch.tensor(self.start_labels[idx]), torch.tensor(self.end_labels[idx])
 
     def __len__(self):
         return len(self.examples)
@@ -30,15 +30,20 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
     #features = []
     encodings = tokenizer(questions, contexts, padding=True, truncation=True)
     start_positions, end_positions = [], []
+    start_labels, end_labels = [], []
     for i, example in tqdm(enumerate(examples)):
         answer = example.answer
         question = example.question
         context = example.context
         q_idx = question.find(answer)
         c_idx = context.find(answer)
+
+        cur_start_label, cur_end_label = [0]*len(encodings['input_ids'][0]), [0]*len(encodings['input_ids'][0])
         if q_idx != -1:
             start_position = encodings.char_to_token(i, q_idx)
             end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
+            if start_position < len(cur_start_label): cur_start_label[start_position] = 1
+            if end_position < len(cur_end_label): cur_end_label[end_position] = 1
 #        while q_idx != -1 and q_idx+len(answer) < len(question) and question[q_idx+len(answer)].isalpha():
 #            q_idx = question.find(answer, q_idx+1)
 #        while c_idx != -1 and c_idx+len(answer) < len(context) and context[c_idx+len(answer)].isalpha():
@@ -48,6 +53,8 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
             context_encoding = tokenizer(context)
             start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
             end_position = context_encoding.char_to_token(c_idx+len(answer)-1) + len(question_tokens) + 1
+            if start_position < len(cur_start_label): cur_start_label[start_position] = 1
+            if end_position < len(cur_end_label): cur_end_label[end_position] = 1
         #elif q_idx != -1:
         #    start_position = encodings.char_to_token(i, q_idx)
         #    end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
@@ -64,9 +71,11 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
 
         start_positions.append(start_position)
         end_positions.append(end_position)
+        start_labels.append(cur_start_label)
+        end_labels.append(cur_end_label)
     encodings['start_positions'] = start_positions
     encodings['end_positions'] = end_positions
-    return encodings
+    return encodings, start_labels, end_labels
 
 
 def get_examples(file_path):
@@ -78,7 +87,7 @@ def get_examples(file_path):
             for para in article['paragraphs']:
                 background = para['background']
                 situation = para['situation']
-                context = background#background + ' ' + situation
+                context = background + ' ' + situation
                 for qa in para['qas']:
                     id = qa['id']
                     question = qa['question']
@@ -89,7 +98,7 @@ def get_examples(file_path):
                         if q_idx != -1:
                             start_position = q_idx
                         else:
-                            start_position = sit_idx #+ len(background) + 1
+                            start_position = sit_idx + len(background) + 1
                         #example = SquadExample(id, question, context, answer, start_position, 'test')
                         example = ROPESExample(id, question, context, answer.strip(), start_position)
                         examples.append(example)
