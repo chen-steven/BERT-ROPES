@@ -13,6 +13,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 BERT_MODEL = "bert-base-cased"
+#BERT_MODEL = "roberta-large"
 
 
 def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
@@ -48,12 +49,15 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
     best_em, best_f1 = -1, -1
     for i in range(args.epochs):
         epoch_iterator = tqdm(train_dataloader, desc="Iteration")
-        for step, batch in enumerate(epoch_iterator):
+        for step, tup in enumerate(epoch_iterator):
+            batch, start_labels, end_labels = tup
             for t in batch:
                 batch[t] = batch[t].to(args.gpu)
-
+            start_labels = start_labels.to(args.gpu)
+            end_labels = end_labels.to(args.gpu)
             outputs = model(**batch)
             loss = outputs[0]
+#            loss = utils.binary_cross_entropy(outputs[1], start_labels) + utils.binary_cross_entropy(outputs[2], end_labels)
             #print(loss.item())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
@@ -85,8 +89,9 @@ def test(args, model, dev_dataset, tokenizer, contrast=False):
     keys = ['input_ids', 'attention_mask', 'token_type_ids', 'start_positions', 'end_positions']
     predictions = {}
     answers = {}
-    for step, batch in enumerate(dev_iterator):
+    for step, tup in enumerate(dev_iterator):
      #   print(batch)
+        batch, start_labels, end_labels = tup
         qids = batch['id']
         del batch['id']
         for key in batch:
@@ -136,7 +141,7 @@ def main():
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--dev-batch-size', default=32, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
-    parser.add_argument('--save-file', default='checkpoint', type=str)
+    parser.add_argument('--save-file', default='checkpoint1', type=str)
     parser.add_argument('--checkpoint', default=None, type=str)
     args = parser.parse_args()
     utils.set_random_seed(args.seed)

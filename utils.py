@@ -13,6 +13,10 @@ def set_random_seed(seed):
 def load_ropes_examples():
     examples = []
 
+def binary_cross_entropy(logits, p1):
+    p2 = torch.sigmoid(logits)
+    return -torch.mean(torch.sum(p1*torch.log(p2) + (1-p1)*torch.log(1-p2), dim=-1))
+
 def discretize(p_start, p_end, max_len=15, no_answer=False):
     """Discretize soft predictions to get start and end indices.
     Choose the pair `(i, j)` of indices that maximizes `p1[i] * p2[j]`
