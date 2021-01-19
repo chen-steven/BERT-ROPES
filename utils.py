@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import random
 
+
 def set_random_seed(seed):
     torch.manual_seed(seed)
     random.seed(seed)
@@ -10,12 +11,14 @@ def set_random_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+
 def load_ropes_examples():
     examples = []
 
 def binary_cross_entropy(logits, p1):
     p2 = torch.sigmoid(logits)
     return -torch.mean(torch.sum(p1*torch.log(p2) + (1-p1)*torch.log(1-p2), dim=-1))
+
 
 def discretize(p_start, p_end, max_len=15, no_answer=False):
     """Discretize soft predictions to get start and end indices.
@@ -74,6 +77,7 @@ def discretize(p_start, p_end, max_len=15, no_answer=False):
 
     return start_idxs, end_idxs
 
+
 class ROPESExample:
     def __init__(self, qas_id, question, context, answer, start_position):
         self.qas_id = qas_id
@@ -83,8 +87,20 @@ class ROPESExample:
         self.start_character = start_position
         self.end_position = start_position + len(answer)
 
+
 class ROPESResult:
     def __init__(self, unique_id, start_logits, end_logits):
         self.start_logits = start_logits
         self.end_logits = end_logits
         self.unique_id = unique_id
+
+
+class HOTPOTExample:
+    def __init__(self, qas_id, question, context, answer, start_position):
+        self.qas_id = qas_id
+        self.question = question
+        self.context = context
+        self.answer = answer
+        self.start_character = start_position
+        self.end_position = start_position + len(answer)
+
