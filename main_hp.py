@@ -1,6 +1,6 @@
 import torch
 import argparse
-from transformers import (BertTokenizerFast, AutoModelForQuestionAnswering, AutoConfig, AdamW,
+from transformers import (BertTokenizerFast, RobertaTokenizerFast, AutoModelForQuestionAnswering, AutoConfig, AdamW,
                           get_linear_schedule_with_warmup)
 from torch.utils.data import DataLoader, RandomSampler
 import torch.nn.functional as F
@@ -12,7 +12,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BERT_MODEL = "bert-base-cased"
+# BERT_MODEL = "bert-base-cased"
+BERT_MODEL = "roberta-large"
 
 
 def train(args, model, dataset, dev_dataset, tokenizer):
@@ -124,7 +125,7 @@ def test(args, model, dev_dataset, tokenizer):
         start_idxs, end_idxs = utils.discretize(F.softmax(outputs[1], dim=1), F.softmax(outputs[2], dim=1))
         for i in range(batch_size):
             s, e = start_idxs[i], end_idxs[i]
-            answers[qids[i]] = tokenizer.decode(batch['input_ids'][i].tolist()[s:e + 1])
+            answers[qids[i]] = tokenizer.decode(batch['input_ids'][i].tolist()[s:e + 1], skip_special_tokens=True)
 
     # Compute EM and F1 on predictions
     res = evaluate_hp.main(answers, tokenizer)
@@ -133,7 +134,7 @@ def test(args, model, dev_dataset, tokenizer):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", default="train/hotpot10_multi", type=str)
+    parser.add_argument("--output_dir", default="train/hotpot10_roberta", type=str)
     parser.add_argument("--batch-size", default=8, type=int)
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--seed', default=10, type=int)
@@ -148,11 +149,11 @@ def main():
     args = parser.parse_args()
 
     utils.set_random_seed(args.seed)
-    config = AutoConfig.from_pretrained(BERT_MODEL)
-    tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
-    model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
-    train_dataset = HOTPOT(tokenizer, 'hotpot_train_v1.1.json', multi_label=args.binary)
-    dev_dataset = HOTPOT(tokenizer, 'hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
+    config = AutoConfig.from_pretrained(BERT_MODEL, cache_dir="train/cache")
+    tokenizer = RobertaTokenizerFast.from_pretrained(BERT_MODEL, cache_dir="train/cache")
+    model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config, cache_dir="train/cache")
+    train_dataset = HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=args.binary)
+    dev_dataset = HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
 
     em, f1 = train(args, model, train_dataset, dev_dataset, tokenizer)
 
