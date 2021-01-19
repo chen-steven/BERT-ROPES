@@ -1,6 +1,6 @@
 import torch
 import argparse
-from transformers import (BertTokenizerFast, AutoModelForQuestionAnswering, AutoConfig, AdamW,
+from transformers import (RobertaTokenizerFast, AutoModelForQuestionAnswering, AutoConfig, AdamW,
                           get_linear_schedule_with_warmup)
 from torch.utils.data import DataLoader, RandomSampler
 import torch.nn.functional as F
@@ -26,6 +26,8 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
     logger.info(f"  Learning rate = {args.learning_rate}")
     logger.info(f"  Using device = {device}")
     logger.info(f"  Batch size = {args.batch_size}")
+    logger.info(f"  Gradient accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Effective batch size = {args.batch_size*args.gradient_accumulation_steps}")
     logger.info(f"  Using random seed = {args.seed}")
     
     model.to(device)
@@ -58,12 +60,15 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             outputs = model(**batch)
             loss = outputs[0] if args.loss_fn == 'ce' else utils.binary_cross_entropy(outputs[1], start_labels) + utils.binary_cross_entropy(outputs[2], end_labels)
 
+            if args.gradient_accumulation_steps > 1:
+                loss = loss / args.gradient_accumulation_steps
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+            if (step+1) % args.gradient_accumulation_steps == 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
-            optimizer.step()
-  #          scheduler.step()
-            model.zero_grad()
+                optimizer.step()
+                # scheduler.step()
+                model.zero_grad()
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
         if contrast_dataset is not None:
             c_loss, c_em, c_f1 = test(args, model, contrast_dataset, tokenizer, contrast=True)
@@ -121,6 +126,7 @@ def main():
     parser.add_argument('--weight-decay', default=0.0, type=float)
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
+    parser.add_argument('--gradient-accumulation-steps', default=1, type=int)
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--dev-batch-size', default=32, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
@@ -131,7 +137,7 @@ def main():
 
     utils.set_random_seed(args.seed)
     config = AutoConfig.from_pretrained(BERT_MODEL)
-    tokenizer = BertTokenizerFast.from_pretrained(BERT_MODEL)
+    tokenizer = RobertaTokenizerFast.from_pretrained(BERT_MODEL)
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config)
 
     if args.checkpoint is not None:

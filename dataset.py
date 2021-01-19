@@ -26,44 +26,57 @@ class ROPES(Dataset):
         return len(self.examples)
 
 def convert_examples_to_features(examples, tokenizer, questions, contexts, max_seq_length=512, doc_stride=1):
+    print('Converting examples to features...')
     #TODO: also return features with ROPESFeatures object
     #features = []
-    encodings = tokenizer(questions, contexts, padding=True, truncation=True)
+    full_context = ['{} {} {} {}'.format(question, tokenizer.sep_token_id, tokenizer.sep_token_id, context) for question,context in zip(questions,contexts)]
+    print(len(full_context))
+    encodings = tokenizer(full_context, padding=True, truncation=True, max_length=512)
     start_positions, end_positions = [], []
     start_labels, end_labels = [], []
+    bad_labels = total = 0
     for i, example in tqdm(enumerate(examples)):
-        answer = example.answer
+        answer = example.answer.strip()
         question = example.question
         context = example.context
         q_idx = question.find(answer)
         c_idx = context.find(answer)
 
         cur_start_label, cur_end_label = [0]*len(encodings['input_ids'][0]), [0]*len(encodings['input_ids'][0])
-        if q_idx != -1:
-            start_position = encodings.char_to_token(i, q_idx)
-            end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
-            if start_position < len(cur_start_label): cur_start_label[start_position] = 1
-            if end_position < len(cur_end_label): cur_end_label[end_position] = 1
+
+        ans_idx = full_context[i].find(answer)
+        start_position = encodings.char_to_token(i, ans_idx)
+        end_position = encodings.char_to_token(i, ans_idx+len(answer)-1)
+        if start_position is None:
+            start_position = 0
+        if end_position is None:
+            end_position = 0
+#        if q_idx != -1:
+#            start_position = encodings.char_to_token(i, q_idx)
+#            end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
+#            if start_position < len(cur_start_label): cur_start_label[start_position] = 1
+#            if end_position < len(cur_end_label): cur_end_label[end_position] = 1
 #        while q_idx != -1 and q_idx+len(answer) < len(question) and question[q_idx+len(answer)].isalpha():
 #            q_idx = question.find(answer, q_idx+1)
 #        while c_idx != -1 and c_idx+len(answer) < len(context) and context[c_idx+len(answer)].isalpha():
 #            c_idx = context.find(answer, c_idx+1)
-        elif c_idx != -1:
-            question_tokens = tokenizer.tokenize(question)
-            context_encoding = tokenizer(context)
-            start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
-            end_position = context_encoding.char_to_token(c_idx+len(answer)-1) + len(question_tokens) + 1
-            if start_position < len(cur_start_label): cur_start_label[start_position] = 1
-            if end_position < len(cur_end_label): cur_end_label[end_position] = 1
+#        elif c_idx != -1:
+#            question_tokens = tokenizer.tokenize(question)
+#            context_encoding = tokenizer(context)
+#            start_position = context_encoding.char_to_token(c_idx) + len(question_tokens) + 1
+#            end_position = context_encoding.char_to_token(c_idx+len(answer)-1) + len(question_tokens) + 1
+#            if start_position < len(cur_start_label): cur_start_label[start_position] = 1
+#            if end_position < len(cur_end_label): cur_end_label[end_position] = 1
         #elif q_idx != -1:
         #    start_position = encodings.char_to_token(i, q_idx)
         #    end_position = encodings.char_to_token(i, q_idx+len(answer)-1)
-        else:
-            start_position = 0
-            end_position = 0
-        tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position+1])
+#        else:
+#            start_position = 0
+#            end_position = 0
+        tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position+1]).strip()
         if tmp != answer and start_position < 512 and end_position < 512:
-            print(tmp, answer)
+            bad_labels += 1
+            print(f'|{tmp}|{answer}|')
         if start_position >= 512:
             start_position = 0
         if end_position >= 512:
@@ -75,6 +88,7 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         end_labels.append(cur_end_label)
     encodings['start_positions'] = start_positions
     encodings['end_positions'] = end_positions
+    print(bad_labels)
     return encodings, start_labels, end_labels
 
 
