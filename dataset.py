@@ -47,11 +47,11 @@ def get_all_one_hot(tokens, text, ans, i=None):
             s_label = tokens.char_to_token(i, idx)
             e_label = tokens.char_to_token(i, idx+len(ans)-1)
             
-            try:
-                start_one_hot[s_label] = 1
-                end_one_hot[e_label] = 1
-            except Exception:
-                pass
+        try:
+            start_one_hot[s_label] = 1
+            end_one_hot[e_label] = 1
+        except Exception:
+            pass
     
     return start_one_hot, end_one_hot
 
