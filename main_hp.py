@@ -27,6 +27,8 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     logger.info(f"  Using device = {device}")
     logger.info(f"  Batch size = {args.batch_size}")
     logger.info(f"  Using random seed = {args.seed}")
+    logger.info(f"  Gradient accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Effective batch size = {args.batch_size * args.gradient_accumulation_steps}")
 
     model.to(device)
     model.train()
@@ -63,12 +65,16 @@ def train(args, model, dataset, dev_dataset, tokenizer):
             else:
                 loss = outputs[0]
 
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+            if args.gradient_accumulation_steps > 1:
+                loss = loss / args.gradient_accumulation_steps
 
-            optimizer.step()
-            scheduler.step()
-            model.zero_grad()
+            loss.backward()
+
+            if (step + 1) % args.gradient_accumulation_steps == 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                optimizer.step()
+                scheduler.step()
+                model.zero_grad()
 
         dev_loss, dev_em, dev_f1 = test(args, model, dev_dataset, tokenizer)
         logger.info(f"***** Evaluation for epoch {i + 1} *****")
@@ -146,6 +152,7 @@ def main():
     parser.add_argument('--dev-batch-size', default=16, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     parser.add_argument('--binary', action="store_true")
+    parser.add_argument('--gradient-accumulation-steps', default=1, type=int)
     args = parser.parse_args()
 
     utils.set_random_seed(args.seed)
