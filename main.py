@@ -60,7 +60,8 @@ def train(args, model, dataset, dev_dataset, tokenizer, contrast_dataset=None):
             start_labels = start_labels.to(args.gpu)
             end_labels = end_labels.to(args.gpu)
             outputs = model(**batch)
-            loss = outputs[0] if args.loss_fn == 'ce' else bce_loss(outputs[1], start_labels) + bce_loss(outputs[2], end_labels)
+
+            loss = outputs[0] if args.loss_fn == 'ce' else (bce_loss(outputs[1], start_labels.type(torch.float32)) + bce_loss(outputs[2], end_labels.type(torch.float32)))
 
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps

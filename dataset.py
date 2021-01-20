@@ -25,6 +25,36 @@ class ROPES(Dataset):
     def __len__(self):
         return len(self.examples)
 
+def find_all(a_str, sub):
+    start = 0
+    while True:
+        start = a_str.find(sub, start)
+        if start == -1: return
+        yield start
+        start += len(sub) # use start += 1 to find overlapping matches
+
+def get_all_one_hot(tokens, text, ans, i=None):
+    ids = tokens['input_ids'][i] if i is not None else tokens['input_ids']
+    start_one_hot, end_one_hot = [0] * len(ids), [0] * len(ids)
+
+    all_idxs = list(find_all(text, ans))
+
+    for idx in all_idxs:
+        if i is None:
+            s_label = tokens.char_to_token(idx)
+            e_label = tokens.char_to_token(idx+len(ans)-1)
+        else:
+            s_label = tokens.char_to_token(i, idx)
+            e_label = tokens.char_to_token(i, idx+len(ans)-1)
+            
+            try:
+                start_one_hot[s_label] = 1
+                end_one_hot[e_label] = 1
+            except Exception:
+                pass
+    
+    return start_one_hot, end_one_hot
+
 def convert_examples_to_features(examples, tokenizer, questions, contexts, max_seq_length=512, doc_stride=1):
     print('Converting examples to features...')
     #TODO: also return features with ROPESFeatures object
@@ -42,8 +72,7 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         q_idx = question.find(answer)
         c_idx = context.find(answer)
 
-        cur_start_label, cur_end_label = [0]*len(encodings['input_ids'][0]), [0]*len(encodings['input_ids'][0])
-
+        cur_start_label, cur_end_label = get_all_one_hot(encodings, full_context[i], answer, i=i)
         ans_idx = full_context[i].find(answer)
         start_position = encodings.char_to_token(i, ans_idx)
         end_position = encodings.char_to_token(i, ans_idx+len(answer)-1)
