@@ -60,8 +60,8 @@ def train(args, model, dataset, dev_dataset, tokenizer):
 
             if args.binary:
                 start_logits, end_logits = outputs[1], outputs[2]
-                loss = binary_cross_entropy(start_logits, batch["start_labels"]) + \
-                       binary_cross_entropy(end_logits, batch["end_labels"])
+                loss = binary_cross_entropy(start_logits, batch["start_labels"], mask=input_batch["attention_mask"]) + \
+                       binary_cross_entropy(end_logits, batch["end_labels"], mask=input_batch["attention_mask"])
             else:
                 loss = outputs[0]
 
@@ -93,10 +93,12 @@ def train(args, model, dataset, dev_dataset, tokenizer):
     return best_em, best_f1
 
 
-def binary_cross_entropy(logits1, p1):
-    p2 = torch.sigmoid(logits1)
-    return -torch.mean(torch.sum(p1 * torch.log(p2 + 1e-30) +
-                                 (1 - p1) * torch.log(1 - p2 + 1e-30), dim=-1))
+def binary_cross_entropy(logits, p1, mask=None):
+    p2 = torch.sigmoid(logits)
+    if mask is not None:
+        p2 = p2[mask.bool()]
+        p1 = p1[mask.bool()]
+    return -torch.mean(p1 * torch.log(p2 + 1e-30) + (1 - p1) * torch.log(1 - p2 + 1e-30))
 
 
 def test(args, model, dev_dataset, tokenizer):
@@ -121,8 +123,8 @@ def test(args, model, dev_dataset, tokenizer):
 
             if args.binary:
                 start_logits, end_logits = outputs[1], outputs[2]
-                loss = binary_cross_entropy(start_logits, batch["start_labels"]) + \
-                       binary_cross_entropy(end_logits, batch["end_labels"])
+                loss = binary_cross_entropy(start_logits, batch["start_labels"], mask=input_batch["attention_mask"]) + \
+                       binary_cross_entropy(end_logits, batch["end_labels"], mask=input_batch["attention_mask"])
             else:
                 loss = outputs[0]
             total_loss += loss.item()

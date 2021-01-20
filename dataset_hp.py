@@ -99,7 +99,7 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
             end_position = 0
         tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position + 1], skip_special_tokens=True)
         if normalize_answer(tmp) != normalize_answer(answer) and start_position < 512 and end_position < 512:
-            print(tmp, answer)
+            # print(tmp, answer)
             count1 += 1
         if start_position >= 512:
             start_position = 0
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     # preprocess_hotpot('hotpot_train_v1.1.json')
     # preprocess_hotpot('hotpot_dev_distractor_v1.json')
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-    HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=True)
+    # HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=True)
     HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', multi_label=True)
     # print('converting to features...')
     # convert_examples_to_features(examples, tokenizer, questions, contexts )
