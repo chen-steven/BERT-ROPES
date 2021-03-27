@@ -1,3 +1,4 @@
+import os
 import torch
 import argparse
 from transformers import (BertTokenizerFast, RobertaTokenizerFast, AutoModelForQuestionAnswering, AutoConfig, AdamW,
@@ -9,11 +10,15 @@ import utils
 import evaluate_hp
 from tqdm import tqdm
 import logging
+import pickle
 
+os.environ['TRANSFORMERS_CACHE'] = 'train/cache/'
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 # BERT_MODEL = "bert-base-cased"
-BERT_MODEL = "roberta-large"
+ROBERTA_MODEL = "roberta-large"
+LONGFORMER_MODEL = "allenai/longformer-base-4096"
+max_length = 4096
 
 
 def train(args, model, dataset, dev_dataset, adv_dev_dataset, tokenizer):
@@ -144,7 +149,7 @@ def test(args, model, dev_dataset, tokenizer, adv=False):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", default="train/hotpot10_roberta", type=str)
-    parser.add_argument("--batch-size", default=8, type=int)
+    parser.add_argument("--batch-size", default=2, type=int)
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--seed', default=10, type=int)
     parser.add_argument('--learning-rate', default=3e-5, type=float)
@@ -152,29 +157,35 @@ def main():
     parser.add_argument('--adam_epsilon', default=1e-8, type=float)
     parser.add_argument('--max-grad-norm', default=1.0, type=float)
     parser.add_argument('--epochs', default=3, type=int)
-    parser.add_argument('--dev-batch-size', default=16, type=int)
+    parser.add_argument('--dev-batch-size', default=4, type=int)
     parser.add_argument('--num-warmup-steps', default=0, type=int)
     parser.add_argument('--binary', action="store_true")
-    parser.add_argument('--gradient-accumulation-steps', default=1, type=int)
+    parser.add_argument('--gradient-accumulation-steps', default=4, type=int)
     args = parser.parse_args()
 
     utils.set_random_seed(args.seed)
-    config = AutoConfig.from_pretrained(BERT_MODEL, cache_dir="train/cache")
-    tokenizer = RobertaTokenizerFast.from_pretrained(BERT_MODEL, cache_dir="train/cache")
-    model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config, cache_dir="train/cache")
-    # train_dataset = HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=args.binary)
-    # dev_dataset = HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
+    config = AutoConfig.from_pretrained(LONGFORMER_MODEL, cache_dir="train/cache")
+    tokenizer = RobertaTokenizerFast.from_pretrained(ROBERTA_MODEL, cache_dir="train/cache")
+    model = AutoModelForQuestionAnswering.from_pretrained(LONGFORMER_MODEL, config=config, cache_dir="train/cache")
+    train_dataset = HOTPOT(tokenizer, 'orig_noyn_hotpot_train_v1.1.json', multi_label=args.binary,
+                           max_seq_length=max_length)
+    pickle.dump(train_dataset, open("data/hotpot/orig_noyn_hotpot_train_v1.1.pkl", 'wb'))
+    dev_dataset = HOTPOT(tokenizer, 'orig_noyn_hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
+    pickle.dump(dev_dataset, open("data/hotpot/orig_noyn_hotpot_dev_distractor_v1.pkl", 'wb'))
     adv_dev_dataset = HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json',
                              eval=True, multi_label=args.binary)
 
-    model = torch.load(f"{args.output_dir}/best.pt")["model"]
-    adv_dev_loss, adv_dev_em, adv_dev_f1 = test(args, model, adv_dev_dataset, tokenizer, adv=True)
-    logger.info(f"adv EM: {adv_dev_em}, adv F1: {adv_dev_f1}, adv loss: {adv_dev_loss}")
-    exit()
-    em, f1 = train(args, model, train_dataset, dev_dataset, adv_dev_dataset, tokenizer)
 
-    with open("train/log", 'a') as f:
-        f.write(f'\n{args.output_dir}, {em}, {f1}\n')
+    # model = torch.load(f"{args.output_dir}/best.pt")["model"]
+    # adv_dev_loss, adv_dev_em, adv_dev_f1 = test(args, model, adv_dev_dataset, tokenizer, adv=True)
+    # logger.info(f"adv EM: {adv_dev_em}, adv F1: {adv_dev_f1}, adv loss: {adv_dev_loss}")
+    # exit()
+    # train_dataset = pickle.load(open("data/hotpot/orig_noyn_hotpot_train_v1.1.pkl", 'rb'))
+    # dev_dataset = pickle.load(open("data/hotpot/orig_noyn_hotpot_dev_distractor_v1.pkl", 'rb'))
+    # em, f1 = train(args, model, train_dataset, dev_dataset, dev_dataset, tokenizer)
+    #
+    # with open("train/log", 'a') as f:
+    #     f.write(f'\n{args.output_dir}, {em}, {f1}\n')
 
 
 if __name__ == '__main__':

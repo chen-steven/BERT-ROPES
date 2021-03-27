@@ -5,23 +5,23 @@ from tqdm import tqdm
 import torch
 from utils import HOTPOTExample
 from evaluate_hp import normalize_answer
-from transformers import BertTokenizerFast, AutoTokenizer, RobertaTokenizerFast
+from transformers import BertTokenizerFast, AutoTokenizer, RobertaTokenizerFast, LongformerTokenizerFast
 # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-tokenizer = RobertaTokenizerFast.from_pretrained('roberta-base')
-
+# tokenizer = RobertaTokenizerFast.from_pretrained('roberta-base')
+tokenizer = LongformerTokenizerFast.from_pretrained('allenai/longformer-large-4096', cache_dir="train/cache")
 
 HOTPOT_DATA_PATH = 'data/hotpot/'
 MAX_PARAGRAPH_LEN = 400
 
 
 class HOTPOT(Dataset):
-    def __init__(self, tokenizer, file_path, eval=False, multi_label=False):
+    def __init__(self, tokenizer, file_path, eval=False, multi_label=False, max_seq_length=512):
         self.tokenizer = tokenizer
         self.eval = eval
         examples, questions, contexts = get_examples(file_path)
         self.examples = examples
         self.encodings = convert_examples_to_features(examples, tokenizer, questions,
-                                                      contexts, multi_label=multi_label)
+                                                      contexts, multi_label=multi_label, max_seq_length=max_seq_length)
 
     def __getitem__(self, idx):
         inputs = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
@@ -37,7 +37,7 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
                                  doc_stride=1, multi_label=False):
     # TODO: also return features with ROPESFeatures object
     # features = []
-    encodings = tokenizer(questions, contexts, padding=True, truncation=True)
+    encodings = tokenizer(questions, contexts, padding=True, truncation=False)
     start_positions, end_positions = [], []
     start_labels, end_labels = [], []
     count, count1 = 0, 0
@@ -50,6 +50,8 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         question_tokens = tokenizer.tokenize(question)
         context_encoding = tokenizer(context)
         length = len(encodings['input_ids'][i])
+        print(length)
+        exit()
         start_label, end_label = [0] * length, [0] * length
         start_ends = []
         if q_idx != -1:
@@ -98,12 +100,12 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
             start_position = 0
             end_position = 0
         tmp = tokenizer.decode(encodings['input_ids'][i][start_position:end_position + 1], skip_special_tokens=True)
-        if normalize_answer(tmp) != normalize_answer(answer) and start_position < 512 and end_position < 512:
+        if normalize_answer(tmp) != normalize_answer(answer) and start_position < length and end_position < length:
             # print(tmp, answer)
             count1 += 1
-        if start_position >= 512:
+        if start_position >= length:
             start_position = 0
-        if end_position >= 512:
+        if end_position >= length:
             end_position = 0
 
         if start_position == end_position == 0:
@@ -242,10 +244,37 @@ def preprocess_hotpot_new(file_path):
     #     json.dump(new_data, f)
 
 
+def preprocess_hotpot_rebuttal(file_path):
+    new_data = []
+    counts = []
+    count = 0
+    with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        for article in tqdm(data):
+            id = article["_id"]
+            question = article['question']
+            answer = article["answer"]
+            # remove yes or no questions
+            counts.append(len(article['context']))
+            if answer in ["yes", "no"]:
+                count += 1
+                continue
+            new_data.append({
+                "id": id,
+                "question": question,
+                "answer": answer,
+                "supporting_facts": article['supporting_facts'],
+                "context": article['context'],
+            })
+    print(count)
+    exit()
+    with open(f'{HOTPOT_DATA_PATH}orig_noyn_{file_path}', 'w') as f:
+        json.dump(new_data, f)
+
 
 if __name__ == '__main__':
-    preprocess_hotpot_new('hotpot_train_v1.1.json')
-    # preprocess_hotpot_new('hotpot_dev_distractor_v1.json')
+    preprocess_hotpot_rebuttal('hotpot_train_v1.1.json')
+    preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1.json')
     # preprocess_hotpot_new('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     # HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=True)
