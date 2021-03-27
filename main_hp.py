@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 BERT_MODEL = "roberta-large"
 
 
-def train(args, model, dataset, dev_dataset, tokenizer):
+def train(args, model, dataset, dev_dataset, adv_dev_dataset, tokenizer):
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
 
     logger.info("***** Running training *****")
@@ -84,7 +84,8 @@ def train(args, model, dataset, dev_dataset, tokenizer):
         if dev_em > best_em:
             best_em = dev_em
             best_f1 = dev_f1
-
+            adv_dev_loss, adv_dev_em, adv_dev_f1 = test(args, model, adv_dev_dataset, tokenizer, adv=True)
+            logger.info(f"adv EM: {adv_dev_em}, adv F1: {adv_dev_f1}, adv loss: {adv_dev_loss}")
             logger.info(f"***** Best Checkpoint, Saving... *****")
             checkpoint = {'args': args.__dict__, 'model': model.cpu()}
             torch.save(checkpoint, f"{args.output_dir}/best.pt")
@@ -101,7 +102,7 @@ def binary_cross_entropy(logits, p1, mask=None):
     return -torch.mean(p1 * torch.log(p2 + 1e-30) + (1 - p1) * torch.log(1 - p2 + 1e-30))
 
 
-def test(args, model, dev_dataset, tokenizer):
+def test(args, model, dev_dataset, tokenizer, adv=False):
     device = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     model.eval()
@@ -136,7 +137,7 @@ def test(args, model, dev_dataset, tokenizer):
             answers[qids[i]] = tokenizer.decode(batch['input_ids'][i].tolist()[s:e + 1], skip_special_tokens=True)
 
     # Compute EM and F1 on predictions
-    res = evaluate_hp.main(answers, tokenizer)
+    res = evaluate_hp.main(answers, tokenizer, adv=adv)
     return total_loss, res['exact_match'], res['f1']
 
 
@@ -161,13 +162,19 @@ def main():
     config = AutoConfig.from_pretrained(BERT_MODEL, cache_dir="train/cache")
     tokenizer = RobertaTokenizerFast.from_pretrained(BERT_MODEL, cache_dir="train/cache")
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config, cache_dir="train/cache")
-    train_dataset = HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=args.binary)
-    dev_dataset = HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
+    # train_dataset = HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=args.binary)
+    # dev_dataset = HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
+    adv_dev_dataset = HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json',
+                             eval=True, multi_label=args.binary)
 
-    em, f1 = train(args, model, train_dataset, dev_dataset, tokenizer)
+    model = torch.load(f"{args.output_dir}/best.pt")["model"]
+    adv_dev_loss, adv_dev_em, adv_dev_f1 = test(args, model, adv_dev_dataset, tokenizer, adv=True)
+    logger.info(f"adv EM: {adv_dev_em}, adv F1: {adv_dev_f1}, adv loss: {adv_dev_loss}")
+    exit()
+    em, f1 = train(args, model, train_dataset, dev_dataset, adv_dev_dataset, tokenizer)
 
     with open("train/log", 'a') as f:
-        f.write(f'{args.output_dir}, {em}, {f1}')
+        f.write(f'\n{args.output_dir}, {em}, {f1}\n')
 
 
 if __name__ == '__main__':

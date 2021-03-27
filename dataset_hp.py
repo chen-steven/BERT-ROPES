@@ -170,8 +170,9 @@ def preprocess_hotpot(file_path):
             np.random.seed(42)
             np.random.shuffle(other_paras)
             assert len(sup_paras) == 2
-            if len(other_paras) > 0:
-                paras = sup_paras + [other_paras[0]] # supporting documents + one other document
+            paras = sup_paras
+            # if len(other_paras) > 0:
+            #     paras = sup_paras + [other_paras[0]] # supporting documents + one other document
             paras = sorted(paras, key=lambda x: x[0])
 
             new_data.append({
@@ -182,18 +183,88 @@ def preprocess_hotpot(file_path):
                 "context": [[para[1], para[2]] for para in paras]
             })
 
-    with open(f'{HOTPOT_DATA_PATH}new_{file_path}', 'w') as f:
+    with open(f'{HOTPOT_DATA_PATH}new1_{file_path}', 'w') as f:
         json.dump(new_data, f)
 
 
+def preprocess_hotpot_new(file_path):
+    from collections import Counter
+    new_data = []
+    counts = []
+    with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        for article in tqdm(data):
+            id = article["_id"]
+            question = article['question']
+            answer = article["answer"]
+            # remove yes or no questions
+            counts.append(len(article['context']))
+            # if answer in ["yes", "no"]:
+            #     continue
+            # supporting_facts = set([title for title, _ in article['supporting_facts']])
+            # sup_paras, add_other_paras, other_paras = [], [], []
+            # existing_titles = set()
+            # for i, (title, sents) in enumerate(article['context']):
+            #     if title in supporting_facts:
+            #         if title in existing_titles:
+            #             continue
+            #         existing_titles.add(title)
+            #         sup_paras.append((i, title, sents))
+            #     else:
+            #         if "[added" in title:
+            #             add_other_paras.append((i, title, sents))
+            #         else:
+            #             other_paras.append((i, title, sents))
+            # np.random.seed(42)
+            # np.random.shuffle(add_other_paras)
+            # np.random.shuffle(other_paras)
+            # assert len(sup_paras) == 2
+            # paras = sup_paras
+            # if len(add_other_paras) > 0:
+            #     paras = sup_paras + [add_other_paras[0]]  # supporting documents + one other document
+            # elif len(other_paras) > 0:
+            #     paras = sup_paras + [other_paras[0]]  # supporting documents + one other document
+            # try:
+            #     assert len(paras) == 3
+            # except:
+            #     print(len(paras), len(add_other_paras), len(other_paras))
+            # paras = sorted(paras, key=lambda x: x[0])
+            # new_data.append({
+            #     "id": id,
+            #     "question": question,
+            #     "answer": answer,
+            #     "supporting_facts": article['supporting_facts'],
+            #     "context": [[para[1], para[2]] for para in paras]
+            # })
+    print(len(new_data))
+    print(Counter(counts))
+    # with open(f'{HOTPOT_DATA_PATH}new_{file_path}', 'w') as f:
+    #     json.dump(new_data, f)
+
+
+
 if __name__ == '__main__':
-    # preprocess_hotpot('hotpot_train_v1.1.json')
-    # preprocess_hotpot('hotpot_dev_distractor_v1.json')
+    preprocess_hotpot_new('hotpot_train_v1.1.json')
+    # preprocess_hotpot_new('hotpot_dev_distractor_v1.json')
+    # preprocess_hotpot_new('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     # HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=True)
-    HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', multi_label=True)
+    # HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', multi_label=True)
     # print('converting to features...')
     # convert_examples_to_features(examples, tokenizer, questions, contexts )
-
     # dataset = ROPES(tokenizer, 'dev-v1.0.json')
     # print(len(dataset[0]['input_ids']))
+    # with open("data/hotpot/new_hotpot_dev_distractor_v1.json", 'r') as f:
+    #     data = json.load(f)
+    # sent_nums = []
+    # for example in tqdm(data):
+    #     context = example["context"]
+    #     tokens, sent_num = [], 0
+    #     for _, sents in context:
+    #         if len(tokens) >= 512:
+    #             break
+    #         for sent in sents:
+    #             tokens.extend(tokenizer.tokenize(sent)[:512 - len(tokens)])
+    #             sent_num += 1
+    #     sent_nums.append(sent_num)
+    # print(np.mean(sent_nums))

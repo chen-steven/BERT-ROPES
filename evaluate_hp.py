@@ -110,16 +110,14 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
 def get_raw_scores(dataset, predictions):
     f1 = exact_match = total = 0
     for article in dataset:
-        if article["answer"] in ["yes", "no"]:
-            continue
         total += 1
-        if article['_id'] not in predictions:
-            message = 'Unanswered question ' + article['_id'] + \
+        if article['id'] not in predictions:
+            message = 'Unanswered question ' + article['id'] + \
                       ' will receive score 0.'
-            # print(message, file=sys.stderr)
+            print(message)
             continue
         ground_truths = [article['answer']]
-        prediction = predictions[article['_id']]
+        prediction = predictions[article['id']]
         exact_match += metric_max_over_ground_truths(
             compute_exact, prediction, ground_truths)
         f1 += metric_max_over_ground_truths(
@@ -171,9 +169,13 @@ def convert_to_predictions(predictions, tokenizer):
     return ans_predictions
 
 
-def main(predictions, tokenizer):
-    with open('data/hotpot/hotpot_dev_distractor_v1.json', 'r') as f:
-        data = json.load(f)
+def main(predictions, tokenizer, adv=False):
+    if adv:
+        with open('data/hotpot/new_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json', 'r') as f:
+            data = json.load(f)
+    else:
+        with open('data/hotpot/new_hotpot_dev_distractor_v1.json', 'r') as f:
+            data = json.load(f)
 
     # ans_predictions = convert_to_predictions(predictions, tokenizer)
     return get_raw_scores(data, predictions)

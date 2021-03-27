@@ -2,9 +2,9 @@ import os
 
 
 def tune_baseline():
-    os.system("mkdir train/hotpot10_roberta")
+    os.system("mkdir train/new_hotpot10_new")
     os.system("python main_hp.py --batch-size 2 --epochs 3 --learning-rate 3e-5 --seed 10 "
-              "--output_dir train/hotpot10_roberta --gradient-accumulation-steps 4 ")
+              "--output_dir train/new_hotpot10_test --gradient-accumulation-steps 4 ")
 
 
 def tune_baseline_bce():
@@ -14,4 +14,4 @@ def tune_baseline_bce():
 
 
 if __name__ == '__main__':
-    tune_baseline_bce()
+    tune_baseline()
