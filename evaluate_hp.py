@@ -170,11 +170,12 @@ def convert_to_predictions(predictions, tokenizer):
 
 
 def main(predictions, tokenizer, adv=False):
+    # print(predictions)
     if adv:
-        with open('data/hotpot/new_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json', 'r') as f:
+        with open('data/hotpot/new_yn_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json', 'r') as f:
             data = json.load(f)
     else:
-        with open('data/hotpot/new_hotpot_dev_distractor_v1.json', 'r') as f:
+        with open('data/hotpot/new_yn_hotpot_dev_distractor_v1.json', 'r') as f:
             data = json.load(f)
 
     # ans_predictions = convert_to_predictions(predictions, tokenizer)

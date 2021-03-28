@@ -7,8 +7,8 @@ from utils import HOTPOTExample
 from evaluate_hp import normalize_answer
 from transformers import BertTokenizerFast, AutoTokenizer, RobertaTokenizerFast, LongformerTokenizerFast
 # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-# tokenizer = RobertaTokenizerFast.from_pretrained('roberta-base')
-tokenizer = LongformerTokenizerFast.from_pretrained('allenai/longformer-large-4096', cache_dir="train/cache")
+tokenizer = RobertaTokenizerFast.from_pretrained('roberta-base')
+# tokenizer = LongformerTokenizerFast.from_pretrained('allenai/longformer-large-4096', cache_dir="train/cache")
 
 HOTPOT_DATA_PATH = 'data/hotpot/'
 MAX_PARAGRAPH_LEN = 400
@@ -37,7 +37,7 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
                                  doc_stride=1, multi_label=False):
     # TODO: also return features with ROPESFeatures object
     # features = []
-    encodings = tokenizer(questions, contexts, padding=True, truncation=False)
+    encodings = tokenizer(questions, contexts, padding=True, truncation=True)
     start_positions, end_positions = [], []
     start_labels, end_labels = [], []
     count, count1 = 0, 0
@@ -50,8 +50,6 @@ def convert_examples_to_features(examples, tokenizer, questions, contexts, max_s
         question_tokens = tokenizer.tokenize(question)
         context_encoding = tokenizer(context)
         length = len(encodings['input_ids'][i])
-        print(length)
-        exit()
         start_label, end_label = [0] * length, [0] * length
         start_ends = []
         if q_idx != -1:
@@ -143,6 +141,7 @@ def get_examples(file_path):
                 start_position = sit_idx
             if start_position == -1:
                 count += 1
+            # print(id, question, context, answer, start_position)
             example = HOTPOTExample(id, question, context, answer.strip(), start_position)
             examples.append(example)
             questions.append(question)
@@ -201,81 +200,114 @@ def preprocess_hotpot_new(file_path):
             answer = article["answer"]
             # remove yes or no questions
             counts.append(len(article['context']))
-            # if answer in ["yes", "no"]:
-            #     continue
-            # supporting_facts = set([title for title, _ in article['supporting_facts']])
-            # sup_paras, add_other_paras, other_paras = [], [], []
-            # existing_titles = set()
-            # for i, (title, sents) in enumerate(article['context']):
-            #     if title in supporting_facts:
-            #         if title in existing_titles:
-            #             continue
-            #         existing_titles.add(title)
-            #         sup_paras.append((i, title, sents))
-            #     else:
-            #         if "[added" in title:
-            #             add_other_paras.append((i, title, sents))
-            #         else:
-            #             other_paras.append((i, title, sents))
-            # np.random.seed(42)
-            # np.random.shuffle(add_other_paras)
-            # np.random.shuffle(other_paras)
-            # assert len(sup_paras) == 2
-            # paras = sup_paras
-            # if len(add_other_paras) > 0:
-            #     paras = sup_paras + [add_other_paras[0]]  # supporting documents + one other document
-            # elif len(other_paras) > 0:
-            #     paras = sup_paras + [other_paras[0]]  # supporting documents + one other document
-            # try:
-            #     assert len(paras) == 3
-            # except:
-            #     print(len(paras), len(add_other_paras), len(other_paras))
-            # paras = sorted(paras, key=lambda x: x[0])
-            # new_data.append({
-            #     "id": id,
-            #     "question": question,
-            #     "answer": answer,
-            #     "supporting_facts": article['supporting_facts'],
-            #     "context": [[para[1], para[2]] for para in paras]
-            # })
+            if answer in ["yes", "no"]:
+                continue
+            supporting_facts = set([title for title, _ in article['supporting_facts']])
+            sup_paras, add_other_paras, other_paras = [], [], []
+            existing_titles = set()
+            for i, (title, sents) in enumerate(article['context']):
+                if title in supporting_facts:
+                    if title in existing_titles:
+                        continue
+                    existing_titles.add(title)
+                    sup_paras.append((i, title, sents))
+                else:
+                    if "[added" in title:
+                        add_other_paras.append((i, title, sents))
+                    else:
+                        other_paras.append((i, title, sents))
+            np.random.seed(42)
+            np.random.shuffle(add_other_paras)
+            np.random.shuffle(other_paras)
+            assert len(sup_paras) == 2
+            paras = sup_paras
+            if len(add_other_paras) > 0:
+                paras = sup_paras + [add_other_paras[0]]  # supporting documents + one other document
+            elif len(other_paras) > 0:
+                paras = sup_paras + [other_paras[0]]  # supporting documents + one other document
+            try:
+                assert len(paras) == 3
+            except:
+                print(len(paras), len(add_other_paras), len(other_paras))
+            paras = sorted(paras, key=lambda x: x[0])
+            new_data.append({
+                "id": id,
+                "question": question,
+                "answer": answer,
+                "supporting_facts": article['supporting_facts'],
+                "context": [[para[1], para[2]] for para in paras]
+            })
     print(len(new_data))
     print(Counter(counts))
-    # with open(f'{HOTPOT_DATA_PATH}new_{file_path}', 'w') as f:
-    #     json.dump(new_data, f)
+    with open(f'{HOTPOT_DATA_PATH}new_yn_{file_path}', 'w') as f:
+        json.dump(new_data, f)
 
 
 def preprocess_hotpot_rebuttal(file_path):
+    from collections import Counter
     new_data = []
     counts = []
-    count = 0
     with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
         data = json.load(f)
         for article in tqdm(data):
             id = article["_id"]
             question = article['question']
             answer = article["answer"]
-            # remove yes or no questions
-            counts.append(len(article['context']))
+
             if answer in ["yes", "no"]:
-                count += 1
-                continue
-            new_data.append({
-                "id": id,
-                "question": question,
-                "answer": answer,
-                "supporting_facts": article['supporting_facts'],
-                "context": article['context'],
-            })
-    print(count)
-    exit()
-    with open(f'{HOTPOT_DATA_PATH}orig_noyn_{file_path}', 'w') as f:
+                question = f"yes no {question}"
+                counts.append(len(article['context']))
+                supporting_facts = set([title for title, _ in article['supporting_facts']])
+                sup_paras, add_other_paras, other_paras = [], [], []
+                existing_titles = set()
+                for i, (title, sents) in enumerate(article['context']):
+                    if title in supporting_facts:
+                        if title in existing_titles:
+                            continue
+                        existing_titles.add(title)
+                        sup_paras.append((i, title, sents))
+                    else:
+                        if "[added" in title:
+                            add_other_paras.append((i, title, sents))
+                        else:
+                            other_paras.append((i, title, sents))
+                np.random.seed(42)
+                np.random.shuffle(add_other_paras)
+                np.random.shuffle(other_paras)
+                assert len(sup_paras) == 2
+                paras = sup_paras
+                if len(add_other_paras) > 0:
+                    paras = sup_paras + [add_other_paras[0]]  # supporting documents + one other document
+                elif len(other_paras) > 0:
+                    paras = sup_paras + [other_paras[0]]  # supporting documents + one other document
+                try:
+                    assert len(paras) == 3
+                except:
+                    print(len(paras), len(add_other_paras), len(other_paras))
+                paras = sorted(paras, key=lambda x: x[0])
+                new_data.append({
+                    "id": id,
+                    "question": question,
+                    "answer": answer,
+                    "supporting_facts": article['supporting_facts'],
+                    "context": [[para[1], para[2]] for para in paras]
+                })
+    print(len(new_data))
+    print(Counter(counts))
+    with open(f'{HOTPOT_DATA_PATH}new_{file_path}', 'r') as f:
+        old_data = json.load(f)
+    for example in old_data:
+        example["question"] = f"yes no {example['question']}"
+        new_data.append(example)
+    print(len(new_data))
+    with open(f'{HOTPOT_DATA_PATH}new_yn_{file_path}', 'w') as f:
         json.dump(new_data, f)
 
 
 if __name__ == '__main__':
     preprocess_hotpot_rebuttal('hotpot_train_v1.1.json')
     preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1.json')
-    # preprocess_hotpot_new('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
+    preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     # HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=True)
     # HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', multi_label=True)
