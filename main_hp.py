@@ -162,19 +162,19 @@ def main():
     config = AutoConfig.from_pretrained(BERT_MODEL, cache_dir="train/cache")
     tokenizer = RobertaTokenizerFast.from_pretrained(BERT_MODEL, cache_dir="train/cache")
     model = AutoModelForQuestionAnswering.from_pretrained(BERT_MODEL, config=config, cache_dir="train/cache")
-    train_dataset = HOTPOT(tokenizer, 'new_yn_hotpot_train_v1.1.json', multi_label=args.binary)
+    # train_dataset = HOTPOT(tokenizer, 'new_yn_hotpot_train_v1.1.json', multi_label=args.binary)
     dev_dataset = HOTPOT(tokenizer, 'new_yn_hotpot_dev_distractor_v1.json', eval=True, multi_label=args.binary)
-    adv_dev_dataset = HOTPOT(tokenizer, 'new_yn_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json',
-                             eval=True, multi_label=args.binary)
+    # adv_dev_dataset = HOTPOT(tokenizer, 'new_yn_hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json',
+    #                          eval=True, multi_label=args.binary)
 
     # model = torch.load(f"{args.output_dir}/best.pt")["model"]
     # adv_dev_loss, adv_dev_em, adv_dev_f1 = test(args, model, dev_dataset, tokenizer, adv=False)
     # logger.info(f"adv EM: {adv_dev_em}, adv F1: {adv_dev_f1}, adv loss: {adv_dev_loss}")
     # exit()
-    em, f1 = train(args, model, train_dataset, dev_dataset, adv_dev_dataset, tokenizer)
+    # em, f1 = train(args, model, train_dataset, dev_dataset, adv_dev_dataset, tokenizer)
 
-    with open("train/log", 'a') as f:
-        f.write(f'\n{args.output_dir}, {em}, {f1}\n')
+    # with open("train/log", 'a') as f:
+    #     f.write(f'\n{args.output_dir}, {em}, {f1}\n')
 
 
 if __name__ == '__main__':

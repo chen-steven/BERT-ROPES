@@ -300,14 +300,31 @@ def preprocess_hotpot_rebuttal(file_path):
         example["question"] = f"yes no {example['question']}"
         new_data.append(example)
     print(len(new_data))
-    with open(f'{HOTPOT_DATA_PATH}new_yn_{file_path}', 'w') as f:
-        json.dump(new_data, f)
+    # with open(f'{HOTPOT_DATA_PATH}new_yn_{file_path}', 'w') as f:
+    #     json.dump(new_data, f)
+
+
+def check_truncation(file_path):
+    with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r') as f:
+        data = json.load(f)
+    count = 0
+    for example in tqdm(data):
+        supporting_facts = set([title for title, _ in example['supporting_facts']])
+        sents = []
+        for _, ss in example["context"]:
+            sents.extend(ss)
+
+        words = tokenizer.tokenize(' '.join([example["question"]] + sents))
+        if example["context"][-1][0] in supporting_facts and len(words) > 512:
+            count += 1
+    print(count)
 
 
 if __name__ == '__main__':
-    preprocess_hotpot_rebuttal('hotpot_train_v1.1.json')
-    preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1.json')
-    preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
+    check_truncation("new_hotpot_dev_distractor_v1.json")
+    # preprocess_hotpot_rebuttal('hotpot_train_v1.1.json')
+    # preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1.json')
+    # preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
     # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
     # HOTPOT(tokenizer, 'new_hotpot_train_v1.1.json', multi_label=True)
     # HOTPOT(tokenizer, 'new_hotpot_dev_distractor_v1.json', multi_label=True)
