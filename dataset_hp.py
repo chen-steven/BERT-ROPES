@@ -5,6 +5,7 @@ from tqdm import tqdm
 import torch
 from utils import HOTPOTExample
 from evaluate_hp import normalize_answer
+from collections import Counter
 from transformers import BertTokenizerFast, AutoTokenizer, RobertaTokenizerFast, LongformerTokenizerFast
 # tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
 tokenizer = RobertaTokenizerFast.from_pretrained('roberta-base')
@@ -189,7 +190,6 @@ def preprocess_hotpot(file_path):
 
 
 def preprocess_hotpot_new(file_path):
-    from collections import Counter
     new_data = []
     counts = []
     with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
@@ -244,7 +244,6 @@ def preprocess_hotpot_new(file_path):
 
 
 def preprocess_hotpot_rebuttal(file_path):
-    from collections import Counter
     new_data = []
     counts = []
     with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
@@ -303,6 +302,45 @@ def preprocess_hotpot_rebuttal(file_path):
     # with open(f'{HOTPOT_DATA_PATH}new_yn_{file_path}', 'w') as f:
     #     json.dump(new_data, f)
 
+def preprocess_hotpot_retrieved_docs(file_path, retrieved_docs_path):
+    retrieved_paras = json.load(open(retrieved_docs_path, 'r'))
+    for key in retrieved_paras:
+        l = []
+        for p in retrieved_paras[key]:
+            l.extend(p)
+        retrieved_paras[key] = l[:3]
+
+    new_data = []
+    counts = []
+    with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        for article in tqdm(data):
+            id = article["_id"]
+            question = article['question']
+            answer = article["answer"]
+
+            question = f"yes no {question}"
+            counts.append(len(article['context']))
+            supporting_facts = set([title for title in retrieved_docs_path[id]])
+            sup_paras, add_other_paras, other_paras = [], [], []
+            for i, (title, sents) in enumerate(article['context']):
+                if title in supporting_facts:
+                    sup_paras.append((i, title, sents))
+
+            paras = sup_paras
+            paras = sorted(paras, key=lambda x: x[0])
+            new_data.append({
+                "id": id,
+                "question": question,
+                "answer": answer,
+                "supporting_facts": article['supporting_facts'],
+                "context": [[para[1], para[2]] for para in paras]
+            })
+    print(len(new_data))
+
+    with open(f'{HOTPOT_DATA_PATH}retrieved_yn_{file_path}', 'w') as f:
+         json.dump(new_data, f)
+
 
 def check_truncation(file_path):
     with open(f'{HOTPOT_DATA_PATH}{file_path}', 'r') as f:
@@ -321,7 +359,9 @@ def check_truncation(file_path):
 
 
 if __name__ == '__main__':
-    check_truncation("new_hotpot_dev_distractor_v1.json")
+    #check_truncation("new_hotpot_dev_distractor_v1.json")
+    preprocess_hotpot_retrieved_docs('hotpot_train_v1.1.json', '')
+    preprocess_hotpot_retrieved_docs('hotpot_dev_distractor_v1.json', '')
     # preprocess_hotpot_rebuttal('hotpot_train_v1.1.json')
     # preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1.json')
     # preprocess_hotpot_rebuttal('hotpot_dev_distractor_v1_addDoc_v6.1_w_titles.json')
